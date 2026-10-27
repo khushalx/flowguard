@@ -1,0 +1,260 @@
+import "server-only";
+import { workspaceSchema, type Project, type Journey } from "../model";
+import {
+  mutationSchema,
+  type Repository,
+  type Installation,
+  type WorkspaceInfo,
+} from "../contracts";
+import { requireWorkspace } from "./auth";
+import { AppError, dbCheck } from "./http";
+import { verifyRepositoryAccess } from "./github";
+
+type Context = Awaited<ReturnType<typeof requireWorkspace>>;
+export async function readWorkspace(context: Context) {
+  const { db, user, workspaceId, role } = context;
+  const results = await Promise.all([
+    db
+      .from("projects")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .order("created_at"),
+    db
+      .from("journeys")
+      .select("*,projects!inner(workspace_id)")
+      .eq("projects.workspace_id", workspaceId)
+      .order("created_at"),
+    db
+      .from("runs")
+      .select("*,run_steps(*),projects!inner(workspace_id)")
+      .eq("projects.workspace_id", workspaceId)
+      .order("started_at", { ascending: false }),
+    db.from("repositories").select("*").eq("workspace_id", workspaceId),
+    db
+      .from("github_installations")
+      .select("id,github_account_login,installation_status,needs_sync")
+      .eq("workspace_id", workspaceId),
+    db.from("profiles").select("*").eq("id", user.id).single(),
+    db.from("workspaces").select("name").eq("id", workspaceId).single(),
+  ]);
+  results.forEach((r) => dbCheck(r.error));
+  const [projects, journeys, runs, repos, installations, profile, ws] = results;
+  const repositories: Repository[] = (repos.data ?? []).map((r) => ({
+    id: r.id,
+    fullName: r.full_name,
+    private: r.is_private,
+    defaultBranch: r.default_branch,
+    status: r.sync_status,
+  }));
+  const workspace = workspaceSchema.parse({
+    projects: (projects.data ?? []).map((p) => ({
+      id: p.id,
+      name: p.name,
+      url: p.target_url,
+      description: p.description,
+      repositoryId: p.repository_id,
+      repository:
+        repositories.find((r) => r.id === p.repository_id)?.fullName ?? "",
+      createdAt: p.created_at,
+    })),
+    journeys: (journeys.data ?? []).map((j) => ({
+      id: j.id,
+      projectId: j.project_id,
+      name: j.name,
+      path: j.start_path,
+      condition: j.success_condition,
+      createdAt: j.created_at,
+    })),
+    runs: (runs.data ?? []).map((r) => ({
+      id: r.id,
+      number: r.number,
+      projectId: r.project_id,
+      journeyId: r.journey_id ?? "",
+      journeyName: r.journey_name,
+      status: r.status,
+      startedAt: r.started_at,
+      duration: r.duration_ms,
+      branch: r.branch ?? "",
+      commit: r.commit_sha ?? "",
+      commitMessage: r.commit_message ?? "",
+      environment: r.environment ?? "",
+      browser: r.browser ?? "",
+      steps: (r.run_steps ?? [])
+        .sort(
+          (a: { sequence_number: number }, b: { sequence_number: number }) =>
+            a.sequence_number - b.sequence_number,
+        )
+        .map(
+          (s: {
+            name: string;
+            status: string;
+            error_message: string | null;
+            metadata: Record<string, unknown>;
+          }) => ({
+            name: s.name,
+            status: s.status,
+            detail: s.error_message ?? "",
+            duration:
+              typeof s.metadata.duration_ms === "number"
+                ? s.metadata.duration_ms
+                : null,
+          }),
+        ),
+      logs: [],
+    })),
+  });
+  const avatar = profile.data?.avatar_url;
+  const info: WorkspaceInfo = {
+    id: workspaceId,
+    name: ws.data!.name,
+    role,
+    account: {
+      id: user.id,
+      name: profile.data?.full_name || profile.data?.username || "Your account",
+      username: profile.data?.username ?? null,
+      email: user.email ?? null,
+      avatar:
+        typeof avatar === "string" &&
+        /^https:\/\/avatars\.githubusercontent\.com\//.test(avatar)
+          ? avatar
+          : null,
+    },
+  };
+  return {
+    workspace,
+    info,
+    repositories,
+    installations: (installations.data ?? []).map((i) => ({
+      id: i.id,
+      account: i.github_account_login,
+      status: i.installation_status,
+      needsSync: i.needs_sync,
+    })) as Installation[],
+  };
+}
+export type LiveSnapshot = Awaited<ReturnType<typeof readWorkspace>>;
+
+export async function mutateWorkspace(raw: unknown, context: Context) {
+  const mutation = mutationSchema.parse(raw);
+  const { db, workspaceId } = context;
+  async function ownedProject(id: string) {
+    const result = await db
+      .from("projects")
+      .select("id,repository_id")
+      .eq("id", id)
+      .eq("workspace_id", workspaceId)
+      .maybeSingle();
+    dbCheck(result.error);
+    if (!result.data)
+      throw new AppError("Project not found in this workspace.", 404);
+    return result.data;
+  }
+  if (
+    mutation.action === "createProject" ||
+    mutation.action === "updateProject"
+  ) {
+    const { input } = mutation;
+    if (input.repositoryId)
+      await verifyRepositoryAccess(context, input.repositoryId);
+    const values = {
+      workspace_id: workspaceId,
+      name: input.name,
+      target_url: input.url,
+      description: input.description,
+      repository_id: input.repositoryId,
+    };
+    if (mutation.action === "updateProject") {
+      await ownedProject(mutation.id);
+      // Workspace ID is immutable; the server never accepts it from the client.
+      const { workspace_id: _workspace, ...patch } = values;
+      void _workspace;
+      const result = await db
+        .from("projects")
+        .update(patch)
+        .eq("id", mutation.id)
+        .eq("workspace_id", workspaceId)
+        .select("id")
+        .single();
+      dbCheck(result.error);
+      return { id: result.data!.id as string };
+    }
+    const result = await db
+      .from("projects")
+      .insert(values)
+      .select("id")
+      .single();
+    dbCheck(result.error);
+    return { id: result.data!.id as string };
+  }
+  if (mutation.action === "deleteProject") {
+    await ownedProject(mutation.id);
+    const result = await db
+      .from("projects")
+      .delete()
+      .eq("id", mutation.id)
+      .eq("workspace_id", workspaceId);
+    dbCheck(result.error);
+    return { id: mutation.id };
+  }
+  if (mutation.action === "saveJourney") {
+    await ownedProject(mutation.input.projectId);
+    const values = {
+      project_id: mutation.input.projectId,
+      name: mutation.input.name,
+      start_path: mutation.input.path,
+      success_condition: mutation.input.condition,
+    };
+    const result = mutation.id
+      ? await db
+          .from("journeys")
+          .update({
+            name: values.name,
+            start_path: values.start_path,
+            success_condition: values.success_condition,
+          })
+          .eq("id", mutation.id)
+          .eq("project_id", values.project_id)
+          .select("id")
+          .single()
+      : await db.from("journeys").insert(values).select("id").single();
+    dbCheck(result.error);
+    return { id: result.data!.id as string };
+  }
+  if (mutation.action === "deleteJourney") {
+    const found = await db
+      .from("journeys")
+      .select("project_id")
+      .eq("id", mutation.id)
+      .maybeSingle();
+    dbCheck(found.error);
+    if (!found.data) throw new AppError("Journey not found.", 404);
+    await ownedProject(found.data.project_id);
+    const result = await db.from("journeys").delete().eq("id", mutation.id);
+    dbCheck(result.error);
+    return { id: mutation.id };
+  }
+  // Explicit import only: deterministic UUIDs derived from original IDs are
+  // scoped to this workspace by the transactional RPC. No demo runs imported.
+  const projects: Project[] = mutation.projects;
+  const journeys: Journey[] = mutation.journeys;
+  projects.forEach((p) => {
+    mutationSchema.options[0].shape.input.parse({ ...p, repositoryId: null });
+  });
+  const result = await db.rpc("import_local_workspace", {
+    projects: projects.map((p) => ({
+      source_id: p.id,
+      name: p.name,
+      target_url: p.url,
+      description: p.description,
+    })),
+    journeys: journeys.map((j) => ({
+      source_id: j.id,
+      project_source_id: j.projectId,
+      name: j.name,
+      start_path: j.path,
+      success_condition: j.condition,
+    })),
+  });
+  dbCheck(result.error);
+  return { id: workspaceId };
+}

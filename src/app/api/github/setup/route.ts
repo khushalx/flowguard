@@ -1,0 +1,60 @@
+import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { requireWorkspace } from "@/lib/server/auth";
+import { connectInstallation } from "@/lib/server/github";
+import { adminClient } from "@/lib/supabase/admin";
+import { hashState, sameSecret } from "@/lib/server/github-security";
+import { appOrigin, safeReturnTo } from "@/lib/env";
+import { AppError, dbCheck, internalRedirect } from "@/lib/server/http";
+
+export async function GET(request: Request) {
+  const store = await cookies();
+  const saved = store.get("fg_install_state")?.value;
+  store.set("fg_install_state", "", {
+    path: "/api/github",
+    maxAge: 0,
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+  let destination = "/app/connections";
+  try {
+    const context = await requireWorkspace(true);
+    const url = new URL(request.url);
+    const state = url.searchParams.get("state");
+    if (!saved || !state || !sameSecret(saved, state))
+      throw new AppError(
+        "Installation state expired. Start the connection again.",
+      );
+    const result = await adminClient().rpc("consume_installation_state", {
+      hash: hashState(state),
+      uid: context.user.id,
+    });
+    dbCheck(result.error);
+    const claim = result.data?.[0];
+    if (!claim || claim.workspace_id !== context.workspaceId)
+      throw new AppError("Installation state was already used or expired.");
+    destination = safeReturnTo(claim.return_to);
+    const id = z.coerce
+      .number()
+      .int()
+      .positive()
+      .safe()
+      .parse(url.searchParams.get("installation_id"));
+    await connectInstallation(context, id);
+    const target = new URL(destination, appOrigin());
+    target.searchParams.set("github", "connected");
+    return NextResponse.redirect(target, 303);
+  } catch (error) {
+    const target = new URL(destination, request.url);
+    target.searchParams.set("github", "error");
+    target.searchParams.set(
+      "message",
+      error instanceof AppError
+        ? error.message
+        : "GitHub connection failed. Check configuration and start again.",
+    );
+    return internalRedirect(target.pathname + target.search);
+  }
+}
