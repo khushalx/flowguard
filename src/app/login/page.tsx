@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, ArrowUpRight } from "lucide-react";
 import { LoginForm } from "@/components/login-form";
 import { BrandMark } from "@/components/brand";
-import { appOrigin, publicConfig, safeReturnTo } from "@/lib/env";
+import { authConfigurationIssues, safeReturnTo } from "@/lib/env";
 import { serverClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
@@ -20,12 +20,8 @@ export default async function Login({
 }) {
   const query = await searchParams;
   const next = safeReturnTo(query.next);
-  let configured = !!publicConfig();
-  try {
-    appOrigin();
-  } catch {
-    configured = false;
-  }
+  const configurationIssues = authConfigurationIssues();
+  const configured = configurationIssues.length === 0;
   if (configured && !query.error) {
     const db = await serverClient();
     const { data } = await db.auth.getUser();
@@ -49,11 +45,18 @@ export default async function Login({
         )}
         {!configured && (
           <div className="info-panel">
-            <p>
-              Authentication isn’t configured on this instance. Follow{" "}
-              <span className="mono">SETUP.md</span> to connect Supabase and
-              GitHub.
-            </p>
+            <div>
+              <p>
+                Authentication isn’t configured on this instance. Follow{" "}
+                <span className="mono">SETUP.md</span> to connect Supabase and
+                GitHub.
+              </p>
+              {configurationIssues.map((issue) => (
+                <p key={issue} className="field-hint">
+                  {issue}
+                </p>
+              ))}
+            </div>
           </div>
         )}
         <LoginForm configured={configured} next={next} />

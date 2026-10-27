@@ -30,6 +30,26 @@ Supabase → Authentication → URL Configuration:
 - Disable anonymous sign-ins and unused providers for this GitHub-only phase.
 - Use the default asymmetric JWT signing key. Next.js 16 `src/proxy.ts` refreshes cookies; private data operations also verify the user with `getUser()`.
 
+### Vercel: login says authentication is not configured
+
+The login gate requires exactly these three variables:
+
+| Variable                               | Required value                                                                                                                                                                  |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`             | Your Supabase project URL. This matches the standard integration name.                                                                                                          |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | The project's publishable key starting with `sb_publishable_`. This matches the standard integration name.                                                                      |
+| `NEXT_PUBLIC_APP_URL`                  | FlowGuard's canonical HTTPS origin, such as `https://YOUR_DOMAIN`, with no `/login`, callback path, query, or credentials. This is FlowGuard-specific; configure it separately. |
+
+`src/lib/env.ts` validates these settings. `src/app/login/page.tsx` renders the configuration warning and passes the resulting boolean to `src/components/login-form.tsx`, which disables the button when configuration is invalid. The warning identifies failing variable names and formats without printing values. No alternate names such as `SUPABASE_URL`, `SUPABASE_ANON_KEY`, or `NEXT_PUBLIC_SUPABASE_ANON_KEY` are read. A legacy anon JWT placed under the publishable name is rejected; use the actual publishable key.
+
+In Vercel → project → Settings → Environment Variables, ensure all three are available to **Production** for the deployed project. Development-only variables and a local `.env.local` do not configure production. If inspecting a Preview deployment, configure its Preview scope and a matching canonical origin/allowlisted callback too; a production origin will reject POSTs sent from a different preview origin.
+
+After changing variables, create a **new production deployment** of the updated source. Next.js embeds `NEXT_PUBLIC_` values at build time; promoting an old build or merely reloading the page does not update them. Vercel environment changes apply to new deployments, not existing ones. If diagnosing a cached deployment, redeploy with the existing Build Cache unchecked to force a fresh build.
+
+Supabase Auth's Site URL must match `NEXT_PUBLIC_APP_URL`, and its redirect allowlist must include that origin plus `/auth/callback`. The separate GitHub OAuth App's callback remains the Supabase provider callback described below. Neither GitHub App credentials nor `SUPABASE_SECRET_KEY` are required to enable or complete sign-in; those server credentials are for repository connections/webhooks.
+
+This configuration check validates presence/formats; it cannot verify provider settings, project connectivity, or migration installation. If the button is enabled but login subsequently fails, inspect those separate setup steps. Never paste secret values into logs or screenshots while troubleshooting.
+
 ## 2. GitHub OAuth login
 
 Create a GitHub **OAuth App** under Settings → Developer settings → OAuth Apps. This is separate from the GitHub App in step 3.
