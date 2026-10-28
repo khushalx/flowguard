@@ -255,6 +255,11 @@ async function main() {
               conclusion: githubMode === "actions-completed" ? "failure" : null,
               updated_at: new Date(Date.now() - 60000).toISOString(),
             });
+          if (
+            path.includes("/actions/workflows/") &&
+            githubMode === "actions-no-workflow"
+          )
+            return send(404, { message: "Not Found" });
           if (path.includes("/actions/workflows/"))
             return send(200, {
               id: 77,

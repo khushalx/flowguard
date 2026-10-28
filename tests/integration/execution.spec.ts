@@ -59,12 +59,12 @@ async function project(page: Page, mode = "actions") {
   const id = (await created.json()).id;
   return id as string;
 }
-async function journey(page: Page, projectId: string) {
+async function journey(page: Page, projectId: string, name = "Heading works") {
   const saved = await post(page, "/api/workspace", {
     action: "saveJourney",
     input: {
       projectId,
-      name: "Heading works",
+      name,
       path: "/",
       condition: "Structured assertion",
       enabled: true,
@@ -104,8 +104,9 @@ test("mock GitHub dispatch and claim persist real local Chromium outcomes and st
   const id = await project(page);
   await page.goto(`/app/projects/${id}`);
   await page
-    .getByRole("button", { name: "Create journey", exact: true })
+    .getByRole("button", { name: "Run your first check", exact: true })
     .click();
+  await page.getByRole("button", { name: "Custom steps", exact: true }).click();
   await page.getByLabel("Journey name").fill("Heading works");
   await page.getByLabel("Expected value").fill("Fixture dashboard");
   await page.screenshot({
@@ -118,14 +119,9 @@ test("mock GitHub dispatch and claim persist real local Chromium outcomes and st
     .getByRole("button", { name: "Create journey", exact: true })
     .click();
   await expect(page.locator(".journey-row")).toContainText("Heading works");
+  await page.getByRole("button", { name: "Close dialog", exact: true }).click();
   const secret = await credential(page, id);
   await page.getByRole("button", { name: "Run a check", exact: true }).click();
-  await expect(
-    page.getByRole("button", { name: "Run 1 journey", exact: true }),
-  ).toBeEnabled();
-  await page
-    .getByRole("button", { name: "Run 1 journey", exact: true })
-    .click();
   await expect(page).toHaveURL(/\/app\/executions\/[a-f0-9-]+$/);
   const batchId = new URL(page.url()).pathname.split("/").at(-1)!;
   const claim = await page.request.post("/api/runner/claim", {
@@ -525,4 +521,137 @@ test("real assertion failure can be investigated and verified without changing i
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
+});
+
+test("first check needs no test code and guides the one-time connection without a dead run button", async ({
+  page,
+}, info) => {
+  const id = await project(page, "actions-no-workflow");
+  await page.goto(`/app/projects/${id}`);
+  await expect(
+    page.getByRole("heading", { name: "Start with one page" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Recent executions" }),
+  ).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Latest run" })).toHaveCount(
+    0,
+  );
+  await page
+    .getByRole("button", { name: "Run your first check", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).not.toContainText(
+    "FLOWGUARD_RUNNER_TOKEN",
+  );
+  await expect(page.getByRole("radio", { name: /Page loads/ })).toBeChecked();
+  await expect(page.getByRole("button", { name: /Run 0/ })).toHaveCount(0);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: `/tmp/flowguard-first-check-${info.project.name}.png`,
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Connect your runner", exact: true }),
+  ).toBeVisible();
+  const editor = new URL(
+    (await page
+      .getByRole("link", { name: "Open prepared file in GitHub" })
+      .getAttribute("href"))!,
+  );
+  expect(editor.searchParams.get("value")).toContain(
+    'FLOWGUARD_URL: "http://127.0.0.1:3010"',
+  );
+  expect(editor.searchParams.get("value")).not.toContain("vars.FLOWGUARD_");
+  expect(editor.searchParams.get("value")).not.toContain("fg_run_");
+  const state = (await (await page.request.get("/api/workspace")).json())
+    .workspace;
+  expect(state.journeys).toHaveLength(1);
+  expect(state.journeys[0].name).toBe("Homepage loads");
+  expect(state.runs).toHaveLength(0);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page.screenshot({
+    path: `/tmp/flowguard-connect-runner-${info.project.name}.png`,
+    fullPage: true,
+  });
+  // A real installation change is represented by the fixture, never by UI acknowledgement.
+  await page
+    .getByRole("button", { name: "Check connection", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Add the runner to your repository" }),
+  ).toBeVisible();
+  await page.request.get("http://127.0.0.1:4545/test/github-mode?mode=actions");
+  await page
+    .getByRole("button", { name: "Check connection", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Generate connection key", exact: true })
+    .click();
+  await expect(page.getByLabel("Connection key — shown once")).toHaveAttribute(
+    "type",
+    "password",
+  );
+  await expect(
+    page.getByRole("button", { name: "Run check", exact: true }),
+  ).toHaveCount(0);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page
+    .getByRole("button", { name: "I’ve saved the key", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Run check", exact: true }),
+  ).toBeEnabled();
+  await page.getByRole("button", { name: "Run check", exact: true }).click();
+  await expect(page).toHaveURL(/app\/executions\/[a-f0-9-]+$/);
+  const after = await (await page.request.get("/api/workspace")).json();
+  expect(after.workspace.journeys).toHaveLength(1);
+  expect(after.workspace.runs[0].status).toBe("queued");
+});
+
+test("text checks validate expectations and ready projects select at most five checks", async ({
+  page,
+}) => {
+  const id = await project(page);
+  await credential(page, id);
+  await page.goto(`/app/projects/${id}`);
+  await page
+    .getByRole("button", { name: "Run your first check", exact: true })
+    .click();
+  await page.getByRole("radio", { name: /Text is visible/ }).check();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await expect(page.getByRole("dialog").getByRole("alert")).toContainText(
+    "Enter text",
+  );
+  await page.getByLabel("Text that should be visible").fill("Welcome back");
+  await page.getByLabel("Page to check").fill("https://foreign.example/");
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await expect(page.getByRole("dialog").getByRole("alert")).toContainText(
+    "this project's website",
+  );
+  await page.getByLabel("Page to check").fill("/account");
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Run check", exact: true }),
+  ).toBeEnabled();
+  await page.keyboard.press("Escape");
+  for (let i = 0; i < 6; i++) await journey(page, id, `Saved check ${i + 1}`);
+  await page.reload();
+  await page.getByRole("button", { name: "Run a check", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Run 5 checks", exact: true }),
+  ).toBeEnabled();
+  const boxes = page.getByRole("dialog").getByRole("checkbox");
+  await expect(boxes).toHaveCount(7);
+  await expect(boxes.nth(5)).toBeDisabled();
+  await boxes.first().uncheck();
+  await expect(boxes.nth(5)).toBeEnabled();
+  await boxes.nth(5).check();
+  await page.getByRole("button", { name: "Run 5 checks", exact: true }).click();
+  await expect(page).toHaveURL(/app\/executions\/[a-f0-9-]+$/);
 });

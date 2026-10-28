@@ -4,6 +4,7 @@ import { z } from "zod";
 import { adminClient } from "../supabase/admin";
 import { requireWorkspace } from "./auth";
 import { AppError, dbCheck } from "./http";
+import { runnerInstallation } from "./runner-installation";
 import {
   createGitHubApp,
   GitHubClient,
@@ -179,8 +180,12 @@ export async function executionSetup(context: Context, projectId: string) {
         ? "Disabled"
         : "Needs structured steps and a positive assertion",
     }));
+  let installation: Awaited<ReturnType<typeof runnerInstallation>> | null =
+    null;
+  let workflowReady = false;
   try {
     const linked = await projectExecution(context, projectId);
+    installation = await runnerInstallation(linked.repository);
     const github = await actionsClient(
       Number(linked.installation.github_installation_id),
       Number(linked.repository.github_repository_id),
@@ -198,8 +203,11 @@ export async function executionSetup(context: Context, projectId: string) {
         "Enable flowguard.yml on your repository's default branch.",
         409,
       );
+    workflowReady = true;
     return {
       ready: !!credential.configured,
+      workflowReady,
+      installation,
       credentialConfigured: !!credential.configured,
       validJourneys: valid.map((j) => ({ id: j.id, name: j.name })),
       skipped,
@@ -210,6 +218,8 @@ export async function executionSetup(context: Context, projectId: string) {
   } catch (error) {
     return {
       ready: false,
+      workflowReady,
+      installation,
       credentialConfigured: !!credential.configured,
       validJourneys: valid.map((j) => ({ id: j.id, name: j.name })),
       skipped,

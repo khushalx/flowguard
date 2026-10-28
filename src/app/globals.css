@@ -3066,3 +3066,266 @@ pre {
 .failure-report > p {
   margin-top: 14px;
 }
+
+/* First check: one decision at a time. */
+.project-first-check {
+  max-width: 520px;
+  margin: 72px auto 88px;
+  text-align: center;
+}
+.first-check-icon {
+  display: inline-flex;
+  color: #aaa;
+  margin-bottom: 23px;
+}
+.project-first-check h2 {
+  font-size: 28px;
+  letter-spacing: -0.8px;
+}
+.project-first-check p {
+  color: #999;
+  line-height: 1.8;
+  margin: 15px 0 25px;
+  font-size: 16px;
+}
+.project-first-check > .field-hint {
+  display: block;
+  margin-top: 17px;
+}
+.first-run-note {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 28px 0;
+  color: #ddd;
+}
+.first-run-note p {
+  color: #999;
+  margin-top: 5px;
+}
+.check-target {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #aaa;
+  font-size: 14px;
+  margin: -8px 0 24px;
+  overflow-wrap: anywhere;
+}
+.check-target .status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #888;
+  flex-shrink: 0;
+}
+.check-choices {
+  border: 0;
+  padding: 0;
+  margin: 0 0 24px;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.check-choice {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 16px;
+  background: #1c1c1c;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.check-choice.selected {
+  background: #232323;
+  border-color: #777;
+}
+.check-choice > svg {
+  flex-shrink: 0;
+  color: #bbb;
+}
+.check-choice input {
+  width: 16px;
+  height: 16px;
+  accent-color: #eee;
+  flex-shrink: 0;
+}
+.check-choice > span {
+  display: grid;
+  gap: 4px;
+}
+.check-choice strong {
+  font-size: 15px;
+  font-weight: 500;
+}
+.check-choice span span {
+  color: #aaa;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.check-url {
+  display: flex;
+  align-items: center;
+  background: #111;
+  border: 1px solid #444;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.check-url:focus-within {
+  outline: 2px solid #aaa;
+  outline-offset: 2px;
+}
+.check-url > span {
+  padding-left: 12px;
+  color: #888;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60%;
+}
+.check-url input {
+  border: 0;
+  background: transparent;
+  min-width: 60px;
+  flex: 1;
+  width: 0;
+  box-shadow: none;
+}
+.check-url input:focus-visible {
+  outline: none;
+}
+.check-form-actions {
+  justify-content: space-between;
+}
+.check-description {
+  line-height: 1.8;
+  color: #aaa;
+  margin: 20px 0;
+}
+.check-loading {
+  padding: 26px 0;
+  color: #aaa;
+}
+.runner-progress {
+  display: flex;
+  gap: 24px;
+  list-style: none;
+  margin: 0 0 30px;
+  padding: 0;
+}
+.runner-progress li {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: #888;
+  font-size: 14px;
+}
+.runner-progress li[aria-current] {
+  color: #f5f5f5;
+}
+.runner-progress li > span {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #262626;
+  border-radius: 50%;
+}
+.runner-install-step h3 {
+  font-size: 18px;
+  letter-spacing: -0.3px;
+}
+.runner-install-step > p {
+  color: #aaa;
+  line-height: 1.8;
+  margin: 12px 0 20px;
+}
+.runner-install-step > .field-hint {
+  font-size: 13px;
+}
+.runner-install-step .technical-details p,
+.runner-advanced p {
+  color: #999;
+  font-size: 14px;
+  line-height: 1.8;
+  margin: 12px 0;
+}
+.runner-advanced {
+  margin-top: 24px;
+}
+.runner-key-field {
+  display: flex;
+  gap: 8px;
+}
+.runner-key-field input {
+  min-width: 0;
+  flex: 1;
+}
+.runner-key-field button {
+  flex-shrink: 0;
+}
+.ready-check {
+  display: flex;
+  gap: 13px;
+  align-items: center;
+  margin: 26px 0;
+}
+.ready-check-icon {
+  display: flex;
+  padding: 10px;
+  background: #282828;
+  border-radius: 50%;
+}
+.ready-check strong {
+  font-size: 17px;
+  font-weight: 500;
+}
+.ready-check p {
+  color: #aaa;
+  margin-top: 4px;
+}
+.run-check-list {
+  display: grid;
+  gap: 13px;
+  margin: 15px 0;
+}
+.run-check-list label {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 15px;
+}
+.run-check-list input {
+  width: 16px;
+  height: 16px;
+  accent-color: #eee;
+}
+@media (max-width: 600px) {
+  .project-first-check {
+    margin: 46px auto 60px;
+  }
+  .project-first-check h2 {
+    font-size: 25px;
+  }
+  .check-choice {
+    padding: 12px;
+    gap: 10px;
+  }
+  .check-choice > svg {
+    display: none;
+  }
+  .runner-progress {
+    gap: 17px;
+  }
+  .check-form-actions {
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .check-url > span {
+    max-width: 58%;
+    font-size: 13px;
+  }
+}

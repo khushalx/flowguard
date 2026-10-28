@@ -129,10 +129,9 @@ test("local project and journey lifecycle persists and stays separate from demo"
     page.getByRole("heading", { name: "My storefront", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Run a check", exact: true }).click();
-  await expect(page.getByRole("dialog")).toContainText(
-    "Test execution isn’t connected yet",
-  );
-  await page.getByRole("button", { name: "Got it" }).click();
+  await expect(page.getByRole("dialog")).toContainText("Run your first check");
+  await page.getByRole("button", { name: "Close dialog" }).click();
+  await page.getByRole("link", { name: /Journeys 0/ }).click();
   await page
     .getByRole("button", { name: "Create journey", exact: true })
     .click();
@@ -161,6 +160,7 @@ test("local project and journey lifecycle persists and stays separate from demo"
     .getByLabel("Journey name", { exact: true })
     .fill("Complete an order");
   await page.getByRole("button", { name: "Save changes", exact: true }).click();
+  await page.goto(projectUrl);
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByLabel("Project name", { exact: true }).fill("Storefront v2");
   await page.getByRole("button", { name: "Save changes", exact: true }).click();

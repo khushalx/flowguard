@@ -53,6 +53,7 @@ export function ProjectDetail({
     .filter((r) => !!r);
   const problems = current.filter(unsuccessful);
   const untested = journeys.length - current.length;
+  const firstCheck = !journeys.length && !runs.length;
   return (
     <>
       <PageHeader
@@ -76,8 +77,7 @@ export function ProjectDetail({
         description={
           journeysOnly
             ? `The workflows that matter to ${project.name}.`
-            : project.description ||
-              "Project configuration and recorded test results."
+            : project.description || ""
         }
         action={
           journeysOnly ? (
@@ -159,7 +159,35 @@ export function ProjectDetail({
           Journeys <span className="count">{journeys.length}</span>
         </Link>
       </nav>
-      {!journeysOnly && (
+      {!journeysOnly && firstCheck && (
+        <section className="project-first-check">
+          <span className="first-check-icon">
+            <Globe size={24} strokeWidth={1.5} />
+          </span>
+          <h2>Start with one page</h2>
+          <p>
+            Check that your homepage loads, or that an important message
+            appears. We’ll save the check and guide you through the first run.
+          </p>
+          <button className="button primary" onClick={() => setExecution(true)}>
+            <Play size={14} />
+            Run your first check
+          </button>
+          <span className="field-hint">
+            No test code to write. Add custom steps whenever you need them.
+          </span>
+        </section>
+      )}
+      {!journeysOnly && !runs.length && journeys.length > 0 && (
+        <div className="first-run-note">
+          <Play size={18} />
+          <div>
+            <strong>Your checks are saved</strong>
+            <p>Run a check to get your first report.</p>
+          </div>
+        </div>
+      )}
+      {!journeysOnly && runs.length > 0 && (
         <section
           className="project-health section"
           aria-label="Current project health"
@@ -190,7 +218,7 @@ export function ProjectDetail({
           ))}
         </section>
       )}
-      {!journeysOnly && (
+      {!journeysOnly && latest && (
         <section className="latest-run-section">
           <SectionHeading
             title="Latest run"
@@ -255,7 +283,7 @@ export function ProjectDetail({
           )}
         </section>
       )}
-      {!journeysOnly && (
+      {!journeysOnly && runs.length > 1 && (
         <section className="section">
           <SectionHeading
             title="Recent executions"
@@ -279,27 +307,29 @@ export function ProjectDetail({
           )}
         </section>
       )}
-      <section className="section">
-        <SectionHeading
-          title={journeysOnly ? "Journeys" : "Saved checks"}
-          count={journeys.length}
-          action={
-            !journeysOnly &&
-            journeys.length > 0 && (
-              <button className="text-link" onClick={() => setEditor(true)}>
-                <Plus size={14} />
-                Create journey
-              </button>
-            )
-          }
-          description={
-            journeysOnly
-              ? "Journey definitions. Editing keeps previous run history."
-              : undefined
-          }
-        />
-        <JourneysList project={project} journeys={journeys} runs={runs} />
-      </section>
+      {(journeysOnly || journeys.length > 0) && (
+        <section className="section">
+          <SectionHeading
+            title={journeysOnly ? "Journeys" : "Saved checks"}
+            count={journeys.length}
+            action={
+              !journeysOnly &&
+              journeys.length > 0 && (
+                <button className="text-link" onClick={() => setEditor(true)}>
+                  <Plus size={14} />
+                  Create journey
+                </button>
+              )
+            }
+            description={
+              journeysOnly
+                ? "Journey definitions. Editing keeps previous run history."
+                : undefined
+            }
+          />
+          <JourneysList project={project} journeys={journeys} runs={runs} />
+        </section>
+      )}
       {journeysOnly && (
         <div className="workspace-note">
           <ListChecks size={17} />
@@ -318,6 +348,7 @@ export function ProjectDetail({
       {execution && (
         <ExecutionLauncher
           project={project}
+          autoRun
           onClose={() => setExecution(false)}
         />
       )}

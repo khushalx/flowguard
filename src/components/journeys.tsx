@@ -14,6 +14,7 @@ import { errorMessage, useFeedback } from "./feedback";
 import { ConfirmDialog, Dialog, EmptyState, StatusIndicator } from "./ui";
 import { StructuredJourneyEditor } from "./structured-journey-editor";
 import { ExecutionLauncher } from "./execution-dialog";
+import { QuickCheck } from "./quick-check";
 
 export function JourneyEditor({
   project,
@@ -25,6 +26,22 @@ export function JourneyEditor({
   onClose: () => void;
 }) {
   const { isLive } = useWorkspace();
+  const [custom, setCustom] = useState(false);
+  if (isLive && !journey && !custom)
+    return (
+      <Dialog
+        title="Add a check"
+        description="Choose what should work on your website."
+        onClose={onClose}
+      >
+        <QuickCheck
+          project={project}
+          label="Save check"
+          onSaved={onClose}
+          onCustom={() => setCustom(true)}
+        />
+      </Dialog>
+    );
   return isLive ? (
     <StructuredJourneyEditor
       project={project}
@@ -321,6 +338,7 @@ export function JourneysList({
         <ExecutionLauncher
           project={project}
           journeyId={executing.id}
+          autoRun
           onClose={() => setExecuting(null)}
         />
       )}

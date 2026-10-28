@@ -1,5 +1,13 @@
 # FlowGuard execution engine
 
+## Default setup in the app
+
+Open a project and choose **Run your first check**. Select **Page loads** or **Text is visible**; custom browser steps remain optional. FlowGuard saves a real structured assertion. The first run guides the repository owner through adding a prefilled workflow and saving one private connection key in GitHub. No repository URL/revision variables need to be entered for the prepared workflow. Once connected, **Run a check** starts saved checks directly; projects with more than five checks choose a batch first.
+
+The prepared workflow pins the published runner source in `src/lib/server/runner-installation.ts`. Keep that SHA reviewed and immutable when updating it. GitHub still requires the user to review/commit the workflow and save `FLOWGUARD_RUNNER_TOKEN`. The app verifies the workflow and its own credential state; it cannot read GitHub's secret value. No Contents write or Secrets write permission is requested. GitHub-owned approval cannot be skipped with the current execution architecture. No migration or new environment variable is required for this UX refinement.
+
+The manual setup below is for custom/vendored installations and troubleshooting.
+
 Phase 3 adds real Chromium execution through a connected repository's GitHub Actions. Vercel coordinates dispatch, scoped authentication, persistence and authorized evidence access; it never launches a browser. `/demo` remains local sample data.
 
 **Rollout status (28 October 2026):** the application is deployed, and the execution-engine migration is installed on the hosted FlowGuard database as version `20261028084831`. The authenticated production overview was verified after repairing the missing migration. External acceptance Test 10 has **not** passed: no live customer workflow has returned a verified result. Complete the runner publication and repository setup below before expecting production execution.

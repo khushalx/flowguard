@@ -111,10 +111,12 @@ export function StructuredJourneyEditor({
   project,
   journey,
   onClose,
+  onSaved,
 }: {
   project: Project;
   journey?: Journey;
   onClose: () => void;
+  onSaved?: (journey: Journey) => void;
 }) {
   const { actions } = useWorkspace();
   const notify = useFeedback();
@@ -179,7 +181,7 @@ export function StructuredJourneyEditor({
     setSaving(true);
     setError("");
     try {
-      await actions.saveJourney(
+      const saved = await actions.saveJourney(
         {
           projectId: project.id,
           name: name.trim(),
@@ -197,7 +199,8 @@ export function StructuredJourneyEditor({
           ? "Journey updated."
           : "Journey saved. Ready to configure execution.",
       );
-      onClose();
+      if (onSaved) onSaved(saved);
+      else onClose();
     } catch (e) {
       setError(errorMessage(e));
     } finally {

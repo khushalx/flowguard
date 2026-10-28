@@ -12,11 +12,17 @@ import {
   type TestStep,
 } from "../../packages/runner/src/schema";
 import { unzipSync, strFromU8 } from "fflate";
+import { pageCheck } from "../../src/lib/check-presets";
 
 let server: http.Server, target: string, directory: string;
 before(async () => {
   directory = await mkdtemp(join(tmpdir(), "flowguard-engine-"));
   server = http.createServer((req, res) => {
+    if (req.url === "/unavailable") {
+      res.writeHead(503, { "Content-Type": "text/html" });
+      res.end("<html><body>Service unavailable</body></html>");
+      return;
+    }
     if (req.url === "/redirect-private") {
       res.writeHead(302, {
         location: "http://169.254.169.254/latest/meta-data/",
@@ -55,6 +61,24 @@ function config(steps: unknown[], captureArtifacts = false) {
 const fixtureOptions = () => ({
   allowPrivateForFixture: true,
   artifactDirectory: directory,
+});
+
+test("the no-code page preset runs real Chromium and never passes an HTTP error page", async () => {
+  for (const [path, status] of [
+    ["/", "passed"],
+    ["/unavailable", "error"],
+  ] as const) {
+    const check = pageCheck(target, path);
+    const { result } = await executeJourney(
+      { ...config(check.definition.steps), startPath: check.path },
+      fixtureOptions(),
+    );
+    if (status === "passed") assert.equal(result.status, "passed");
+    else {
+      assert.notEqual(result.status, "passed");
+      assert.match(result.error || "", /503/);
+    }
+  }
 });
 
 test("real Chromium navigation and positive heading assertion pass", async () => {
