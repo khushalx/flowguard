@@ -6,5 +6,5 @@ export default async function RunPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  return <RunDetail id={id} />;
+  return <RunDetail key={id} id={id} />;
 }

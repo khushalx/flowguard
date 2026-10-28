@@ -186,6 +186,7 @@ export function Investigation({
                   width={960}
                   height={540}
                   alt={`Illustrative demo screenshot for ${run.journeyName}. Observed: ${run.assertion?.received ?? "Sample page"}.`}
+                  loading="eager"
                   unoptimized
                 />
               </button>

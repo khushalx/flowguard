@@ -1,5 +1,5 @@
 import { AppShell } from "@/components/app-shell";
-import { DemoWorkspaceProvider } from "@/lib/workspace-store";
+import { DemoWorkspaceProvider } from "@/lib/demo-workspace-provider";
 export default function DemoLayout({
   children,
 }: {

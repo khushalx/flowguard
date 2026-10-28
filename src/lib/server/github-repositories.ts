@@ -1,4 +1,5 @@
 import { Octokit } from "octokit";
+import { GitHubClient, boundedFetch } from "./github-client";
 
 // The optional transport is a test seam, never populated from request input.
 export async function fetchInstallationRepositories(
@@ -6,13 +7,26 @@ export async function fetchInstallationRepositories(
   installationId: number,
   transport?: typeof fetch,
 ) {
+  const deadline = AbortSignal.timeout(20_000);
   const { data: grant } = await app.request(
     "POST /app/installations/{installation_id}/access_tokens",
-    { installation_id: installationId, permissions: { metadata: "read" } },
+    {
+      installation_id: installationId,
+      permissions: { metadata: "read" },
+      request: { signal: deadline },
+    },
   );
-  const client = new Octokit({
+  const client = new GitHubClient({
     auth: grant.token,
-    request: transport ? { fetch: transport } : undefined,
+    request: {
+      fetch: (input: RequestInfo | URL, init?: RequestInit) =>
+        (transport ?? boundedFetch)(input, {
+          ...init,
+          signal: init?.signal
+            ? AbortSignal.any([init.signal, deadline])
+            : deadline,
+        }),
+    },
   });
   const repos = await client.paginate("GET /installation/repositories", {
     per_page: 100,

@@ -1,7 +1,7 @@
 "use client";
 import Link from "./workspace-link";
 import { useWorkspaceRouter as useRouter } from "./workspace-link";
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, useEffect, useRef, type FormEvent } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -27,39 +27,69 @@ export function ProjectSetup() {
   const [repositoryId, setRepositoryId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const submitting = useRef(false);
+  const draftKey = `flowguard.setup.draft.v2.${info?.id ?? "demo"}`;
+  const contentStep = isLive && step < 2 ? 1 - step : step;
   useEffect(() => {
     if (!isLive) return;
     let saved: string | null = null;
     try {
-      saved = sessionStorage.getItem("flowguard.setup.draft.v1");
+      saved = sessionStorage.getItem(draftKey);
     } catch {
       return;
     }
     if (saved) {
       try {
         const draft = JSON.parse(saved) as Record<string, unknown>;
-        if (typeof draft.name === "string" && typeof draft.url === "string") {
+        if (
+          typeof draft.name === "string" &&
+          typeof draft.url === "string" &&
+          typeof draft.savedAt === "number" &&
+          Date.now() - draft.savedAt < 30 * 60_000
+        ) {
           // Hydrate a user-authored draft after returning from the GitHub redirect.
           // eslint-disable-next-line react-hooks/set-state-in-effect
           setName(draft.name.slice(0, 80));
           setUrl(draft.url.slice(0, 2000));
-          setStep(1);
+          setRepository(
+            typeof draft.repository === "string"
+              ? draft.repository.slice(0, 160)
+              : "",
+          );
+          setRepositoryId(
+            typeof draft.repositoryId === "string" &&
+              /^[a-f0-9-]{36}$/i.test(draft.repositoryId)
+              ? draft.repositoryId
+              : null,
+          );
+          setStep(
+            typeof draft.step === "number" && [0, 1, 2].includes(draft.step)
+              ? draft.step
+              : 0,
+          );
         }
       } catch {
         try {
-          sessionStorage.removeItem("flowguard.setup.draft.v1");
+          sessionStorage.removeItem(draftKey);
         } catch {
           /* Draft storage is optional. */
         }
       }
     }
-  }, [isLive]);
+  }, [isLive, draftKey]);
   useEffect(() => {
     const save = () => {
       try {
         sessionStorage.setItem(
-          "flowguard.setup.draft.v1",
-          JSON.stringify({ name, url }),
+          draftKey,
+          JSON.stringify({
+            name,
+            url,
+            repository,
+            repositoryId,
+            step,
+            savedAt: Date.now(),
+          }),
         );
       } catch {
         /* The server connection still works if draft storage is unavailable. */
@@ -68,18 +98,19 @@ export function ProjectSetup() {
     window.addEventListener("flowguard:save-project-draft", save);
     return () =>
       window.removeEventListener("flowguard:save-project-draft", save);
-  }, [name, url]);
+  }, [name, url, repository, repositoryId, step, draftKey]);
   if (!data) return <WorkspaceLoading />;
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (submitting.current) return;
     const nextErrors: Record<string, string> = {};
-    if (step === 0) {
+    if (contentStep === 0) {
       if (!name.trim()) nextErrors.name = "Enter a project name.";
       if (!validTarget(url.trim()))
         nextErrors.url = "Enter a complete http:// or https:// URL.";
     }
     if (
-      step === 1 &&
+      contentStep === 1 &&
       !isLive &&
       repository.trim() &&
       !/^[\w.-]+\/[\w.-]+$/.test(repository.trim())
@@ -95,6 +126,7 @@ export function ProjectSetup() {
       setStep(step + 1);
       return;
     }
+    submitting.current = true;
     setSaving(true);
     try {
       const project = await actions.createProject({
@@ -106,7 +138,7 @@ export function ProjectSetup() {
       });
       if (isLive) {
         try {
-          sessionStorage.removeItem("flowguard.setup.draft.v1");
+          sessionStorage.removeItem(draftKey);
         } catch {
           /* Database save already succeeded. */
         }
@@ -119,6 +151,7 @@ export function ProjectSetup() {
       router.push(`/app/projects/${project.id}`);
     } catch (e) {
       notify(errorMessage(e), "error");
+      submitting.current = false;
       setSaving(false);
     }
   }
@@ -138,20 +171,21 @@ export function ProjectSetup() {
       <div className="setup-layout">
         <aside className="setup-sidebar">
           <ol className="setup-steps">
-            {["Project details", "Repository", "Review & create"].map(
-              (label, i) => (
-                <li
-                  key={label}
-                  className={i === step ? "active" : i < step ? "complete" : ""}
-                  aria-current={i === step ? "step" : undefined}
-                >
-                  <span className="step-index mono">
-                    {i < step ? <Check size={14} /> : `0${i + 1}`}
-                  </span>
-                  <span>{label}</span>
-                </li>
-              ),
-            )}
+            {(isLive
+              ? ["Repository", "Project details", "Review & create"]
+              : ["Project details", "Repository", "Review & create"]
+            ).map((label, i) => (
+              <li
+                key={label}
+                className={i === step ? "active" : i < step ? "complete" : ""}
+                aria-current={i === step ? "step" : undefined}
+              >
+                <span className="step-index mono">
+                  {i < step ? <Check size={14} /> : `0${i + 1}`}
+                </span>
+                <span>{label}</span>
+              </li>
+            ))}
           </ol>
           <div className="setup-note">
             <Globe size={17} />
@@ -174,7 +208,7 @@ export function ProjectSetup() {
                   "Give your project a home",
                   "Add repository context",
                   "Everything in the right place?",
-                ][step]
+                ][contentStep]
               }
             </h2>
             <p className="form-intro">
@@ -185,10 +219,10 @@ export function ProjectSetup() {
                     ? "Select a verified repository, or continue without one."
                     : "An optional reference for the code behind your website.",
                   "Review your configuration before creating the project.",
-                ][step]
+                ][contentStep]
               }
             </p>
-            {step === 0 && (
+            {contentStep === 0 && (
               <>
                 <div className="field">
                   <label htmlFor="setup-name">Project name</label>
@@ -235,16 +269,20 @@ export function ProjectSetup() {
                 </div>
               </>
             )}
-            {step === 1 && isLive && (
+            {contentStep === 1 && isLive && (
               <RepositoryPicker
                 value={repositoryId}
                 onChange={(id, name) => {
                   setRepositoryId(id);
                   setRepository(name);
+                  if (!name.trim()) return;
+                  setName(
+                    (previous) => previous || name.split("/").at(-1) || "",
+                  );
                 }}
               />
             )}
-            {step === 1 && !isLive && (
+            {contentStep === 1 && !isLive && (
               <>
                 <div className="integration-placeholder">
                   <GitFork size={23} strokeWidth={1.5} />
@@ -328,6 +366,7 @@ export function ProjectSetup() {
               <button
                 type="button"
                 className="button ghost"
+                disabled={saving}
                 onClick={() => {
                   setStep(step - 1);
                   setErrors({});

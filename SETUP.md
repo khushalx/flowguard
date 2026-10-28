@@ -13,7 +13,7 @@ Set `NEXT_PUBLIC_APP_URL=http://127.0.0.1:3000` locally. Use that exact hostname
 
 Create or choose your Supabase project. Copy its URL and **publishable** key from Connect / API keys into `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Put its server **secret** key (`sb_secret_...`) in `SUPABASE_SECRET_KEY`. Never prefix a secret key with `NEXT_PUBLIC_`.
 
-Apply `supabase/migrations/20261027215703_phase_two_foundation.sql` in the SQL editor, or use the pinned CLI:
+Apply the migrations in `supabase/migrations/` in timestamp order. Existing Phase 2 databases need only `20261028000816_stabilize_connections.sql`; do not rerun the foundation SQL. Alternatively, use the pinned CLI:
 
 ```sh
 npx supabase login
@@ -80,9 +80,11 @@ Use a quoted PEM with escaped newlines in `.env.local`:
 GITHUB_APP_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\nYOUR_REAL_KEY_LINES\n-----END RSA PRIVATE KEY-----"
 ```
 
-Actual multiline values in your hosting provider's secret editor also work. `.env*` and `*.pem` are ignored; never commit secrets. In production, use a server secret manager.
+Actual multiline values in your hosting provider's secret editor also work. Use the complete downloaded RSA PEM, including header and footer; do not paste the filename, a placeholder, or extra literal wrapping quotes into the hosting editor. Invalid keys disable repository connection with a configuration warning; they do not disable GitHub sign-in. `.env*` and `*.pem` are ignored; never commit secrets. In production, use a server secret manager.
 
-In `/app/projects/new`, enter details, then **Connect GitHub**. The server creates a ten-minute, single-use state bound to the user/workspace, stores its hash privately, and sets a matching HttpOnly cookie. The callback verifies that state, fetches the installation with App credentials, checks personal ownership and existing workspace claims, and lists repositories with a server-only installation token. Selecting a repository rechecks live access before saving. Tokens are never stored or returned to the UI. The name/URL draft survives the redirect in sessionStorage and contains no credentials. Repository linking is optional.
+In `/app/projects/new`, FlowGuard first checks for an existing personal GitHub App installation using your verified immutable provider ID. Accessible repositories appear automatically. Choose a repository, enter project details and the target URL, then create the project. If the App is absent, choose **Connect repositories** once. The server creates a ten-minute, single-use state bound to the user/workspace, stores its hash privately, and sets a matching HttpOnly cookie. The callback verifies that state, fetches the installation with App credentials, checks personal ownership and existing workspace claims, and lists repositories with a server-only installation token. Selecting a repository rechecks live access before saving. Tokens are never stored or returned to the UI. The name, URL, repository selection and setup step survive the redirect in workspace-scoped sessionStorage for 30 minutes and contain no credentials. Repository linking is optional.
+
+**Manage repository access** opens the verified installation settings in a separate tab. Return to FlowGuard to refresh automatically, or click **Refresh**. GitHub settings updates without state return to a fresh discovery page; their query-string installation IDs are never claimed. A missing/invalid state on a new installation still fails closed. Discovery is deduplicated within the current provider, and a 60-second workspace-scoped SQL freshness check avoids repeated GitHub calls. Refresh and lifecycle webhooks invalidate freshness. An explicit disconnect remains disconnected until you choose to reconnect.
 
 ## 4. Webhooks locally and in production
 
@@ -106,6 +108,7 @@ Targets accept HTTP(S), valid hostnames, and no embedded credentials. The server
 
 ```sh
 npm run test:security
+npm run test:server
 npx playwright install chromium
 npm run test:e2e
 npm run test:integration
@@ -118,7 +121,7 @@ Security tests execute the actual migration in PGlite's PostgreSQL engine with m
 
 Browser tests without credentials cover protected redirects, recoverable auth/configuration errors, demo CRUD/persistence, public routes, responsive layouts, and accessibility.
 
-`test:integration` starts a separate local server on 3010 and a test-only Auth/PostgREST fixture on 4545, backed by the actual PostgreSQL migration. It tests PKCE challenge/verifier exchange, cookie persistence, authenticated CRUD, explicit import/deduplication, logout and revoked sessions on desktop/mobile. Auth and the HTTP gateway are mocked; it does not exercise hosted Supabase or real GitHub login. The fixture is never imported by application source. Generated files use the ignored `.next-auth-test` directory. Additional Octokit tests mock metadata-only token creation and paginated repository responses.
+`test:integration` builds and starts a separate **production** server on 3010, a test-only Auth/PostgREST fixture on 4545, and a measurement proxy on 4546, backed by all actual PostgreSQL migrations. It tests PKCE challenge/verifier exchange, cookie persistence, authenticated CRUD, explicit import/deduplication, logout and revoked sessions on desktop/mobile. Auth and the HTTP gateway are mocked; it does not exercise hosted Supabase or real GitHub login. The fixture is never imported by application source. Generated files use the ignored `.next-auth-test` directory. The integration-only Node preload redirects GitHub REST to the local fixture. Browser tests exercise installation discovery, state/callback validation, draft preservation, repository linking, access changes, rate limits and deletion. Additional Octokit/server tests mock metadata-only token creation, paginated listing, duplicate claims, and immutable ownership. No integration test contacts real GitHub or claims a live grant.
 
 After setup, verify with two GitHub accounts in separate browser profiles:
 
@@ -132,6 +135,15 @@ After setup, verify with two GitHub accounts in separate browser profiles:
 
 ## Unverified external setup
 
-This checkout has no configured Supabase project, OAuth provider, GitHub App key/installation, or public webhook endpoint. Live sign-in, hosted migrations, session refresh against hosted Auth, repository API access, and real webhook deliveries remain unverified until setup is completed. No external integration is claimed as live-tested. Test execution, recording, AI diagnostics, payments and billing remain outside Phase 2.
+Automated tests use local fixtures. Validate hosted Supabase migrations, real OAuth/session refresh, repository access and webhook delivery separately after deployment. See [STABILIZATION.md](STABILIZATION.md) for the audit, measured limits and rollout steps. Test execution, recording, AI diagnostics, payments and billing remain outside Phase 2.
 
 References: [Supabase SSR](https://supabase.com/docs/guides/auth/server-side/creating-a-client), [GitHub OAuth](https://supabase.com/docs/guides/auth/social-sign-in/auth-github), [installation authentication](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/authenticating-as-a-github-app-installation), [webhook signatures](https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries).
+
+
+## Stabilization rollout
+
+Apply the additive stabilization migration **before** deploying the new source. It adds read-only, RLS-bound context/latest-run functions, a latest-run index, and installation freshness/disconnect columns. It inserts no projects or results and preserves existing data. Where Supabase's optional auto-RLS event-trigger helper exists, it removes client execution privileges while retaining the trigger and owner access. Inspect the pending SQL, then use `npx supabase db push`, or apply just the new file once in the SQL editor and keep migration history consistent. Run hosted security/performance advisors afterward.
+
+`vercel.json` pins functions to `bom1` (Mumbai), matching this project's Supabase region. A new deployment is required; the region change does not alter an existing deployment. Other deployments should set their region to match their own database. See [Vercel function regions](https://vercel.com/docs/functions/configuring-functions/region).
+
+Routine reads use `workspace_context`; bootstrap runs only on the first sign-in or when context is missing. Saves return confirmed records without a full workspace reload. History loads 50 summaries per page plus the latest result per journey; step evidence loads only on a run details page. No private responses use a shared cache. API workspace responses expose safe `Server-Timing` durations, while slow backend logs contain only service/status/duration.

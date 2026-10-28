@@ -9,7 +9,7 @@ export default function Link(props: ComponentProps<typeof NextLink>) {
     typeof props.href === "string" && /^\/app(?:\/|$)/.test(props.href)
       ? base + props.href.slice(4)
       : props.href;
-  return <NextLink {...props} href={href} />;
+  return <NextLink prefetch={false} {...props} href={href} />;
 }
 export function useWorkspaceRouter() {
   const router = useNextRouter();

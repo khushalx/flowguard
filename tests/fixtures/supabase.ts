@@ -45,20 +45,17 @@ const session = () => ({
 });
 const codes = new Map<string, string>();
 let revoked = false;
+let githubMode = "missing";
 
 async function main() {
   await db.exec(
     `create role anon;create role authenticated;create role service_role bypassrls;create schema auth;create table auth.users(id uuid primary key);create table auth.identities(user_id uuid references auth.users,provider text,provider_id text,identity_data jsonb);create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;grant usage on schema auth to authenticated,service_role;grant execute on function auth.uid() to authenticated,service_role;insert into auth.users values('${uid}');insert into auth.identities values('${uid}','github','1001','{"user_name":"alice","full_name":"Alice Developer"}');`,
   );
-  await db.exec(
-    readFileSync(
-      "supabase/migrations/" +
-        readdirSync("supabase/migrations").find((f) =>
-          f.endsWith("_phase_two_foundation.sql"),
-        ),
-      "utf8",
-    ),
-  );
+  for (const file of readdirSync("supabase/migrations")
+    .filter((f) => f.endsWith(".sql"))
+    .sort()) {
+    await db.exec(readFileSync(`supabase/migrations/${file}`, "utf8"));
+  }
 
   async function queryRest(
     tx: Transaction,
@@ -89,6 +86,15 @@ async function main() {
         );
         continue;
       }
+      if (/^[a-z_]+$/.test(key) && value.startsWith("in.(")) {
+        const list = value.slice(4, -1).split(",");
+        const placeholders = list.map((item) => {
+          values.push(item);
+          return `$${values.length}`;
+        });
+        filters.push(`"${key}" in (${placeholders.join(",")})`);
+        continue;
+      }
       if (!/^[a-z_]+$/.test(key) || !value.startsWith("eq."))
         throw new Error("Unsupported fixture filter");
       values.push(value.slice(3));
@@ -96,10 +102,32 @@ async function main() {
     }
     const where = filters.length ? " where " + filters.join(" and ") : "";
     let rows;
-    if (method === "GET")
-      rows = (await tx.query(`select * from public.${table}${where}`, values))
-        .rows;
-    else if (method === "DELETE")
+    if (method === "GET") {
+      const order = url.searchParams.get("order");
+      const ordering =
+        order && /^[a-z_]+\.(asc|desc)(,[a-z_]+\.(asc|desc))*$/.test(order)
+          ? " order by " +
+            order
+              .split(",")
+              .map((x) => x.replace(".", " "))
+              .join(",")
+          : "";
+      const limit = Number(url.searchParams.get("limit") ?? 1000);
+      const offset = Number(url.searchParams.get("offset") ?? 0);
+      if (
+        !Number.isSafeInteger(limit) ||
+        limit < 0 ||
+        !Number.isSafeInteger(offset) ||
+        offset < 0
+      )
+        throw new Error("Invalid pagination");
+      rows = (
+        await tx.query(
+          `select * from public.${table}${where}${ordering} limit ${limit} offset ${offset}`,
+          values,
+        )
+      ).rows;
+    } else if (method === "DELETE")
       rows = (
         await tx.query(
           `delete from public.${table}${where} returning *`,
@@ -131,19 +159,32 @@ async function main() {
       }
     }
     // PostgREST serializes timestamptz with offsets; test the UI's real shape.
-    return rows.map((row) => {
-      const r = { ...(row as Record<string, unknown>) } as Record<
-        string,
-        unknown
-      >;
-      for (const key in r) {
-        if (r[key] instanceof Date)
-          r[key] = (r[key] as Date).toISOString().replace("Z", "+00:00");
-      }
-      if (table === "journeys") r.projects = { workspace_id: uid };
-      if (table === "runs") r.run_steps = [];
-      return r;
-    });
+    return Promise.all(
+      rows.map(async (row) => {
+        const r = { ...(row as Record<string, unknown>) } as Record<
+          string,
+          unknown
+        >;
+        for (const key in r) {
+          if (r[key] instanceof Date)
+            r[key] = (r[key] as Date).toISOString().replace("Z", "+00:00");
+        }
+        if (table === "journeys") r.projects = { workspace_id: uid };
+        if (
+          table === "runs" &&
+          url.searchParams.get("select")?.includes("run_steps(")
+        ) {
+          // Nested evidence stays confined to the explicitly requested run.
+          r.run_steps = (
+            await tx.query(
+              "select * from public.run_steps where run_id=$1 order by sequence_number",
+              [r.id],
+            )
+          ).rows;
+        }
+        return r;
+      }),
+    );
   }
   const server = createServer(async (req, res) => {
     const url = new URL(req.url!, "http://127.0.0.1:4545");
@@ -156,6 +197,71 @@ async function main() {
     };
     try {
       if (url.pathname === "/health") return send(200, { ok: true });
+      if (url.pathname === "/test/github-mode") {
+        githubMode = url.searchParams.get("mode") ?? "missing";
+        return send(200, { ok: true });
+      }
+      if (url.pathname.startsWith("/github/")) {
+        const path = url.pathname.slice(7);
+        if (path === "/user/1001")
+          return send(200, { id: 1001, type: "User", login: "alice" });
+        if (githubMode === "missing" || githubMode === "removed")
+          return send(404, { message: "Not Found" });
+        if (githubMode === "failed")
+          return send(503, { message: "Unavailable" });
+        if (githubMode === "limited") {
+          res.setHeader("x-ratelimit-remaining", "0");
+          return send(403, { message: "Rate limit" });
+        }
+        if (path.endsWith("/access_tokens"))
+          return send(200, {
+            token: "fixture-installation-token",
+            expires_at: new Date(Date.now() + 3600_000).toISOString(),
+          });
+        if (path === "/installation/repositories") {
+          const ids = githubMode === "updated" ? [457, 458] : [456, 457];
+          return send(200, {
+            total_count: ids.length,
+            repositories: ids.map((id) => ({
+              id,
+              owner: { login: "alice" },
+              name: `repo-${id}`,
+              full_name: `alice/repo-${id}`,
+              default_branch: "main",
+              private: id === 456,
+              html_url: `https://github.com/alice/repo-${id}`,
+            })),
+          });
+        }
+        return send(200, {
+          id: 123,
+          account: {
+            id: path.includes("/999") ? 999 : 1001,
+            type: "User",
+            login: "alice",
+          },
+          suspended_at: null,
+        });
+      }
+      if (url.pathname === "/test/seed-runs") {
+        const project = await db.query<{ id: string }>(
+          "insert into public.projects(workspace_id,name,target_url) select id,'History fixture','https://history.example.com' from public.workspaces where owner_id=$1 returning id",
+          [uid],
+        );
+        await db.query(
+          "insert into public.runs(project_id,journey_name,status,started_at) select $1,'Recorded fixture','passed',now()-make_interval(mins=>s) from generate_series(1,60) s",
+          [project.rows[0].id],
+        );
+        const oldest = await db.query<{ id: string }>(
+          "select id from public.runs where project_id=$1 order by started_at limit 1",
+          [project.rows[0].id],
+        );
+        await db.query(
+          "insert into public.run_steps(run_id,sequence_number,name,status,metadata) values($1,1,'Fixture page assertion','passed','{}')",
+          [oldest.rows[0].id],
+        );
+        return send(200, { id: oldest.rows[0].id });
+      }
       if (url.pathname === "/test/revoke") {
         revoked = true;
         return send(200, { ok: true });
@@ -165,6 +271,7 @@ async function main() {
           "delete from public.workspaces; delete from public.profiles;",
         );
         revoked = false;
+        githubMode = "missing";
         return send(200, { ok: true });
       }
       if (url.pathname === "/auth/v1/authorize") {
@@ -196,7 +303,12 @@ async function main() {
         } else if (revoked) return send(401, { msg: "Session expired" });
         return send(200, session());
       }
-      if (req.headers.authorization !== `Bearer ${accessToken}` || revoked)
+      const service =
+        req.headers.authorization === "Bearer sb_secret_local_fixture_only";
+      if (
+        !service &&
+        (req.headers.authorization !== `Bearer ${accessToken}` || revoked)
+      )
         return send(401, { code: "bad_jwt", msg: "Invalid session" });
       if (url.pathname === "/auth/v1/user") return send(200, user);
       if (url.pathname === "/auth/v1/logout") {
@@ -205,16 +317,66 @@ async function main() {
       }
       if (!url.pathname.startsWith("/rest/v1/")) return send(404, {});
       const rows = await db.transaction(async (tx) => {
-        await tx.exec("set local role authenticated");
+        await tx.exec(
+          service
+            ? "set local role service_role"
+            : "set local role authenticated",
+        );
         await tx.query("select set_config('request.jwt.claim.sub',$1,true)", [
           uid,
         ]);
+        if (url.pathname === "/rest/v1/rpc/issue_installation_state") {
+          await tx.query(
+            "select public.issue_installation_state($1,$2,$3,$4)",
+            [body.token_hash, body.user_id, body.workspace_id, body.return_to],
+          );
+          return null;
+        }
+        if (url.pathname === "/rest/v1/rpc/consume_installation_state")
+          return (
+            await tx.query(
+              "select * from public.consume_installation_state($1,$2)",
+              [body.hash, body.uid],
+            )
+          ).rows;
+        if (url.pathname === "/rest/v1/rpc/sync_installation_repositories") {
+          await tx.query(
+            "select public.sync_installation_repositories($1,$2::jsonb)",
+            [body.iid, JSON.stringify(body.repos)],
+          );
+          return null;
+        }
+        if (url.pathname === "/rest/v1/rpc/disconnect_installation") {
+          await tx.query("select public.disconnect_installation($1,$2)", [
+            body.iid,
+            body.wid,
+          ]);
+          return null;
+        }
         if (url.pathname === "/rest/v1/rpc/bootstrap_workspace")
           return (
             await tx.query<{ id: string }>(
               "select public.bootstrap_workspace() as id",
             )
           ).rows[0].id;
+        if (url.pathname === "/rest/v1/rpc/workspace_context")
+          return (await tx.query("select * from public.workspace_context()"))
+            .rows;
+        if (url.pathname === "/rest/v1/rpc/latest_workspace_runs")
+          return (
+            await tx.query("select * from public.latest_workspace_runs($1)", [
+              body.wid,
+            ])
+          ).rows.map((row) =>
+            Object.fromEntries(
+              Object.entries(row as Record<string, unknown>).map(
+                ([key, value]) => [
+                  key,
+                  value instanceof Date ? value.toISOString() : value,
+                ],
+              ),
+            ),
+          );
         if (url.pathname === "/rest/v1/rpc/import_local_workspace") {
           await tx.query(
             "select public.import_local_workspace($1::jsonb,$2::jsonb)",

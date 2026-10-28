@@ -52,6 +52,7 @@ export type Installation = {
   account: string;
   status: ConnectionStatus;
   needsSync: boolean;
+  managementUrl: string;
 };
 export type Account = {
   id: string;

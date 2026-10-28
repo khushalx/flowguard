@@ -1,5 +1,5 @@
 "use client";
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, useRef, type FormEvent } from "react";
 import { useWorkspaceRouter as useRouter } from "./workspace-link";
 import { Trash2 } from "lucide-react";
 import { validTarget, type Project } from "@/lib/model";
@@ -24,11 +24,67 @@ export function ProjectSettings({
   const [deleting, setDeleting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saveError, setSaveError] = useState<string | null>(null);
-  const { actions, isLive } = useWorkspace();
+  const { actions, isLive, info } = useWorkspace();
   const notify = useFeedback();
   const router = useRouter();
+  const submitting = useRef(false);
+  const draftKey = `flowguard.settings.draft.v1.${info?.id}.${project.id}`;
+  useEffect(() => {
+    if (!isLive) return;
+    try {
+      const draft = JSON.parse(sessionStorage.getItem(draftKey) ?? "null");
+      if (
+        draft &&
+        typeof draft.savedAt === "number" &&
+        Date.now() - draft.savedAt < 30 * 60_000 &&
+        typeof draft.name === "string" &&
+        typeof draft.url === "string"
+      ) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setName(draft.name.slice(0, 80));
+        setUrl(draft.url.slice(0, 2000));
+        setRepository(
+          typeof draft.repository === "string"
+            ? draft.repository.slice(0, 160)
+            : "",
+        );
+        setRepositoryId(
+          typeof draft.repositoryId === "string" &&
+            /^[a-f0-9-]{36}$/i.test(draft.repositoryId)
+            ? draft.repositoryId
+            : null,
+        );
+      }
+    } catch {
+      /* An unavailable or corrupt optional draft never blocks settings. */
+    }
+  }, [isLive, draftKey]);
+  useEffect(() => {
+    const save = () => {
+      try {
+        sessionStorage.setItem(
+          draftKey,
+          JSON.stringify({
+            name,
+            url,
+            repository,
+            repositoryId,
+            savedAt: Date.now(),
+          }),
+        );
+      } catch {
+        setSaveError(
+          "This browser cannot preserve the draft. Copy your changes before connecting repositories.",
+        );
+      }
+    };
+    window.addEventListener("flowguard:save-project-draft", save);
+    return () =>
+      window.removeEventListener("flowguard:save-project-draft", save);
+  }, [draftKey, name, url, repository, repositoryId]);
   async function submit(e: FormEvent) {
     e.preventDefault();
+    if (submitting.current) return;
     const next: Record<string, string> = {};
     if (!name.trim()) next.name = "Enter a project name.";
     if (!validTarget(url.trim()))
@@ -44,6 +100,7 @@ export function ProjectSettings({
       document.getElementById(`edit-${Object.keys(next)[0]}`)?.focus();
       return;
     }
+    submitting.current = true;
     setSaving(true);
     try {
       await actions.updateProject({
@@ -53,12 +110,18 @@ export function ProjectSettings({
         repository: repository.trim(),
         repositoryId,
       });
+      try {
+        sessionStorage.removeItem(draftKey);
+      } catch {
+        /* Database save succeeded. */
+      }
       notify(
         isLive ? "Project settings saved." : "Project settings saved locally.",
       );
       onClose();
     } catch (e) {
       setSaveError(errorMessage(e));
+      submitting.current = false;
       setSaving(false);
     }
   }

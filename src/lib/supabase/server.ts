@@ -2,6 +2,7 @@ import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { publicConfig } from "../env";
+import { backendFetch } from "../server/transport";
 
 export async function serverClient() {
   const config = publicConfig();
@@ -11,6 +12,7 @@ export async function serverClient() {
     );
   const store = await cookies();
   return createServerClient(config.url, config.key, {
+    global: { fetch: backendFetch("supabase") },
     cookieOptions: {
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",

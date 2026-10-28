@@ -9,27 +9,48 @@ import {
   jsonBody,
   sameOrigin,
 } from "@/lib/server/http";
-import { githubConfigured, syncRepositories } from "@/lib/server/github";
+import { discoverInstallation, syncRepositories } from "@/lib/server/github";
+import { githubConfigurationIssue } from "@/lib/server/github-client";
+import { readConnections } from "@/lib/server/workspace";
 import { adminClient } from "@/lib/supabase/admin";
 import { hashState } from "@/lib/server/github-security";
 import { safeReturnTo } from "@/lib/env";
 
 const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("connect"), returnTo: z.string().optional() }),
+  z.object({ action: z.literal("discover"), refresh: z.boolean().optional() }),
   z.object({ action: z.literal("refresh"), id: z.string().uuid() }),
   z.object({ action: z.literal("disconnect"), id: z.string().uuid() }),
 ]);
+export async function GET() {
+  try {
+    return Response.json(await readConnections(await requireWorkspace()), {
+      headers: { "Cache-Control": "private, no-store" },
+    });
+  } catch (error) {
+    return apiError(error);
+  }
+}
 export async function POST(request: Request) {
   try {
     sameOrigin(request);
     const body = schema.parse(await jsonBody(request));
     const context = await requireWorkspace(true);
-    if (!githubConfigured())
-      throw new AppError(
-        "GitHub App is not configured on this instance. Follow SETUP.md.",
-        503,
-      );
+    const issue = githubConfigurationIssue();
+    if (issue) throw new AppError(issue, 503);
     const admin = adminClient();
+    if (body.action === "discover" || body.action === "connect") {
+      const connected = await discoverInstallation(
+        context,
+        body.action === "connect",
+        body.action === "discover" && body.refresh,
+      );
+      if (body.action === "discover" || connected)
+        return Response.json(
+          { connected, ...(await readConnections(context)) },
+          { headers: { "Cache-Control": "private, no-store" } },
+        );
+    }
     if (body.action === "connect") {
       const state = randomBytes(32).toString("hex");
       const result = await admin.rpc("issue_installation_state", {
@@ -56,7 +77,7 @@ export async function POST(request: Request) {
     }
     const installation = await context.db
       .from("github_installations")
-      .select("id")
+      .select("id,github_installation_id")
       .eq("id", body.id)
       .eq("workspace_id", context.workspaceId)
       .maybeSingle();
@@ -71,7 +92,9 @@ export async function POST(request: Request) {
       });
       dbCheck(result.error);
     }
-    return Response.json({ ok: true });
+    return Response.json(await readConnections(context), {
+      headers: { "Cache-Control": "private, no-store" },
+    });
   } catch (error) {
     return apiError(error);
   }

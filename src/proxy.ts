@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { publicConfig, safeReturnTo } from "@/lib/env";
+import { backendFetch } from "@/lib/server/transport";
 
 export async function proxy(request: NextRequest) {
   const headers = new Headers(request.headers);
@@ -11,8 +12,9 @@ export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request: { headers } });
   const config = publicConfig();
   let authenticated = false;
-  if (config) {
+  if (config && request.nextUrl.pathname !== "/api/github/webhook") {
     const supabase = createServerClient(config.url, config.key, {
+      global: { fetch: backendFetch("supabase") },
       cookieOptions: {
         sameSite: "lax",
         secure: process.env.NODE_ENV === "production",

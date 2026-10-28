@@ -18,6 +18,7 @@
 # next.js
 /.next/
 /.next-auth-test/
+/.next-e2e-test/
 /out/
 
 # production

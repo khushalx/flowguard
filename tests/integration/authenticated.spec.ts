@@ -65,12 +65,12 @@ test("mocked GitHub PKCE sign-in creates a real SQL workspace; CRUD persists, im
   );
   await page.goto("/app/projects");
   await page.getByRole("link", { name: "New project", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Connect repositories", exact: true }),
+  ).toBeEnabled();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
   await page.getByLabel("Project name").fill("Persistent app");
   await page.getByLabel("Target URL").fill("https://persistent.example.com");
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await expect(
-    page.getByRole("button", { name: "Connect GitHub", exact: true }),
-  ).toBeDisabled();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await page
     .getByRole("button", { name: "Create project", exact: true })

@@ -1,6 +1,6 @@
 "use client";
 import Link from "./workspace-link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChevronDown, Copy, GitCommitHorizontal, Play } from "lucide-react";
 import { duration, host } from "@/lib/model";
 import { useWorkspace } from "@/lib/workspace-store";
@@ -11,13 +11,53 @@ import {
   PageHeader,
   StatusIndicator,
   WorkspaceLoading,
+  EmptyState,
 } from "./ui";
 import { Investigation } from "./investigation";
 
 export function RunDetail({ id }: { id: string }) {
-  const { workspace: w, data } = useWorkspace();
+  const { workspace: w, data, isLive, loadRun } = useWorkspace();
+  const [ready, setReady] = useState(!isLive);
+  const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    if (!isLive) return;
+    let active = true;
+    loadRun(id)
+      .then(() => {
+        if (active) setReady(true);
+      })
+      .catch((e) => {
+        if (active)
+          setError(
+            e instanceof Error ? e.message : "Run details could not be loaded.",
+          );
+      });
+    return () => {
+      active = false;
+    };
+  }, [id, isLive, loadRun, attempt]);
   const [execution, setExecution] = useState(false);
   const notify = useFeedback();
+  if (error)
+    return (
+      <EmptyState
+        title="Run unavailable"
+        description={error}
+        action={
+          <button
+            className="button secondary"
+            onClick={() => {
+              setError(null);
+              setAttempt((n) => n + 1);
+            }}
+          >
+            Try again
+          </button>
+        }
+      />
+    );
+  if (!ready) return <WorkspaceLoading />;
   if (!w) return <WorkspaceLoading />;
   const run = w.runs.find((r) => r.id === id);
   if (!run) return <MissingRecord kind="run" />;

@@ -1,93 +1,13 @@
 "use client";
-import {
-  createContext,
-  useContext,
-  useState,
-  useCallback,
-  type ReactNode,
-} from "react";
-import { useWorkspace as useDemoWorkspace } from "./demo-store";
-import type { Project, Journey, Workspace, Storage } from "./model";
-import type { Repository, Installation, WorkspaceInfo } from "./contracts";
+import { useState, useCallback, useRef, type ReactNode } from "react";
+import { Context, apiRequest, type State } from "./workspace-context";
+import { projectSchema, journeySchema, runSchema } from "./model";
 import type { LiveSnapshot } from "./server/workspace";
-
-type Actions = {
-  createProject(input: Omit<Project, "id" | "createdAt">): Promise<Project>;
-  updateProject(project: Project): Promise<unknown>;
-  deleteProject(id: string): Promise<unknown>;
-  saveJourney(
-    input: Omit<Journey, "id" | "createdAt">,
-    existing?: Journey,
-  ): Promise<Journey>;
-  deleteJourney(id: string): Promise<unknown>;
-  setMode(mode: Storage["mode"]): Promise<unknown>;
-  recover(): Promise<unknown>;
-};
-type State = {
-  data: { mode: Storage["mode"] | "live" } | null;
-  workspace: Workspace | null;
-  error: string | null;
-  actions: Actions;
-  info: WorkspaceInfo | null;
-  repositories: Repository[];
-  installations: Installation[];
-  githubAvailable: boolean;
-  isLive: boolean;
-  basePath: string;
-  refresh: () => Promise<void>;
-};
-const Context = createContext<State | null>(null);
-
-export async function apiRequest(path: string, body?: unknown) {
-  const response = await fetch(path, {
-    method: body ? "POST" : "GET",
-    headers: body ? { "Content-Type": "application/json" } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
-    cache: "no-store",
-  });
-  const result = await response.json();
-  if (response.status === 401) {
-    // A full navigation clears all authenticated client state on expiry.
-    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-    window.location.assign(
-      `/login?error=session_expired&next=${encodeURIComponent(location.pathname + location.search)}`,
-    );
-    throw new Error("Your session has expired. Sign in again.");
-  }
-  if (!response.ok)
-    throw new Error(result.error ?? "Request failed. Try again.");
-  return result;
-}
-export function DemoWorkspaceProvider({ children }: { children: ReactNode }) {
-  const demo = useDemoWorkspace();
-  const local = demo.actions;
-  const actions: Actions = {
-    createProject: async (p) => local.createProject(p),
-    updateProject: async (p) => local.updateProject(p),
-    deleteProject: async (id) => local.deleteProject(id),
-    saveJourney: async (p, j) => local.saveJourney(p, j),
-    deleteJourney: async (id) => local.deleteJourney(id),
-    setMode: async (mode) => local.setMode(mode),
-    recover: async () => local.recover(),
-  };
-  return (
-    <Context.Provider
-      value={{
-        ...demo,
-        actions,
-        info: null,
-        repositories: [],
-        installations: [],
-        githubAvailable: false,
-        isLive: false,
-        basePath: "/demo",
-        refresh: async () => {},
-      }}
-    >
-      {children}
-    </Context.Provider>
-  );
-}
+export {
+  apiRequest,
+  useWorkspace,
+  useWorkspaceBase,
+} from "./workspace-context";
 export function LiveWorkspaceProvider({
   initial,
   githubAvailable,
@@ -98,41 +18,184 @@ export function LiveWorkspaceProvider({
   children: ReactNode;
 }) {
   const [state, setState] = useState(initial);
-  const refresh = useCallback(async () => {
-    setState(await apiRequest("/api/workspace"));
+  const runDetails = useRef(new Map<string, Promise<void>>());
+  const loadRun = useCallback(async (id: string) => {
+    if (runDetails.current.has(id)) return runDetails.current.get(id);
+    const pending = apiRequest(`/api/runs/${encodeURIComponent(id)}`)
+      .then((result) => {
+        const run = runSchema.parse(result);
+        setState((s) => ({
+          ...s,
+          workspace: {
+            ...s.workspace,
+            runs: [...s.workspace.runs.filter((r) => r.id !== id), run],
+          },
+        }));
+      })
+      .catch((error) => {
+        runDetails.current.delete(id);
+        throw error;
+      });
+    runDetails.current.set(id, pending);
+    return pending;
   }, []);
-  async function mutate(body: unknown) {
-    const result = await apiRequest("/api/workspace", body);
-    try {
-      await refresh();
-    } catch {
-      throw new Error(
-        "Saved to your workspace, but the view could not refresh. Reload before making further changes.",
-      );
-    }
-    return result as { id: string };
+  const runOffset = useRef(initial.runOffset);
+  async function loadMoreRuns() {
+    const result = await apiRequest(`/api/runs?offset=${runOffset.current}`);
+    const runs = runSchema.array().parse(result.runs);
+    runOffset.current += runs.length;
+    setState((s) => ({
+      ...s,
+      runsHasMore: result.hasMore,
+      workspace: {
+        ...s.workspace,
+        runs: [
+          ...s.workspace.runs,
+          ...runs.filter(
+            (r) => !s.workspace.runs.some((old) => old.id === r.id),
+          ),
+        ],
+      },
+    }));
   }
-  const actions: Actions = {
-    async createProject(input) {
-      const result = await mutate({ action: "createProject", input });
-      return { ...input, id: result.id, createdAt: new Date().toISOString() };
+  const discovery = useRef<{ pending: Promise<void> | null; checked: number }>({
+    pending: null,
+    checked: 0,
+  });
+  const discoverRepositories = useCallback(
+    async (force = false) => {
+      if (!githubAvailable) return;
+      if (discovery.current.pending) return discovery.current.pending;
+      if (!force && Date.now() - discovery.current.checked < 60_000) return;
+      const pending = apiRequest("/api/github", {
+        action: "discover",
+        refresh: force,
+      })
+        .then((result) => {
+          setState((s) => ({
+            ...s,
+            repositories: result.repositories,
+            installations: result.installations,
+          }));
+          discovery.current.checked = Date.now();
+        })
+        .catch(async (error) => {
+          // A failed verification may have reconciled a removal in SQL.
+          // Replace stale connection labels without reloading the workspace.
+          try {
+            const connections = await apiRequest("/api/github");
+            setState((s) => ({
+              ...s,
+              repositories: connections.repositories,
+              installations: connections.installations,
+            }));
+          } catch {
+            throw new Error(
+              `${error instanceof Error ? error.message : "Repository access could not be checked."} Reload to check the latest connection state.`,
+            );
+          }
+          throw error;
+        })
+        .finally(() => {
+          discovery.current.pending = null;
+        });
+      discovery.current.pending = pending;
+      return pending;
     },
-    updateProject: async (input) =>
-      mutate({ action: "updateProject", id: input.id, input }),
-    deleteProject: async (id) => mutate({ action: "deleteProject", id }),
+    [githubAvailable],
+  );
+  const refresh = useCallback(async () => {
+    const next = await apiRequest("/api/workspace");
+    runOffset.current = next.runOffset;
+    runDetails.current.clear();
+    setState(next);
+  }, []);
+  function setConnections(
+    connections: Pick<LiveSnapshot, "repositories" | "installations">,
+  ) {
+    setState((s) => ({
+      ...s,
+      repositories: connections.repositories,
+      installations: connections.installations,
+    }));
+  }
+  const actions: State["actions"] = {
+    async createProject(input) {
+      const result = await apiRequest("/api/workspace", {
+        action: "createProject",
+        input,
+      });
+      const project = projectSchema.parse(result.project);
+      setState((s) => ({
+        ...s,
+        workspace: {
+          ...s.workspace,
+          projects: [...s.workspace.projects, project],
+        },
+      }));
+      return project;
+    },
+    async updateProject(input) {
+      const result = await apiRequest("/api/workspace", {
+        action: "updateProject",
+        id: input.id,
+        input,
+      });
+      const project = projectSchema.parse(result.project);
+      setState((s) => ({
+        ...s,
+        workspace: {
+          ...s.workspace,
+          projects: s.workspace.projects.map((p) =>
+            p.id === project.id ? project : p,
+          ),
+        },
+      }));
+    },
+    async deleteProject(id) {
+      await apiRequest("/api/workspace", { action: "deleteProject", id });
+      setState((s) => ({
+        ...s,
+        workspace: {
+          projects: s.workspace.projects.filter((p) => p.id !== id),
+          journeys: s.workspace.journeys.filter((j) => j.projectId !== id),
+          runs: s.workspace.runs.filter((r) => r.projectId !== id),
+        },
+      }));
+    },
     async saveJourney(input, existing) {
-      const result = await mutate({
+      const result = await apiRequest("/api/workspace", {
         action: "saveJourney",
         input,
         id: existing?.id,
       });
-      return {
-        ...input,
-        id: result.id,
-        createdAt: existing?.createdAt ?? new Date().toISOString(),
-      };
+      const journey = journeySchema.parse(result.journey);
+      setState((s) => ({
+        ...s,
+        workspace: {
+          ...s.workspace,
+          journeys: existing
+            ? s.workspace.journeys.map((j) =>
+                j.id === journey.id ? journey : j,
+              )
+            : [...s.workspace.journeys, journey],
+        },
+      }));
+      return journey;
     },
-    deleteJourney: async (id) => mutate({ action: "deleteJourney", id }),
+    async deleteJourney(id) {
+      await apiRequest("/api/workspace", { action: "deleteJourney", id });
+      setState((s) => ({
+        ...s,
+        workspace: {
+          ...s.workspace,
+          journeys: s.workspace.journeys.filter((j) => j.id !== id),
+          runs: s.workspace.runs.map((r) =>
+            r.journeyId === id ? { ...r, journeyId: "" } : r,
+          ),
+        },
+      }));
+    },
     setMode: async () => {
       throw new Error("Open the separate demo to use browser-only data.");
     },
@@ -151,18 +214,15 @@ export function LiveWorkspaceProvider({
         isLive: true,
         basePath: "/app",
         githubAvailable,
+        setConnections,
+        discoverRepositories,
+        loadRun,
+        loadMoreRuns,
+        runsHasMore: state.runsHasMore,
         refresh,
       }}
     >
       {children}
     </Context.Provider>
   );
-}
-export function useWorkspace() {
-  const state = useContext(Context);
-  if (!state) throw new Error("Workspace provider is missing.");
-  return state;
-}
-export function useWorkspaceBase() {
-  return useContext(Context)?.basePath ?? "/app";
 }

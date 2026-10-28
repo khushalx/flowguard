@@ -1,0 +1,186 @@
+{
+  "recordedOn": "2026-10-28",
+  "environment": "Local Next.js production builds; Chromium desktop/mobile; mocked Auth/GitHub HTTP; actual migrations executed in PGlite. No network throttling. Not live production performance.",
+  "limitations": [
+    "Single representative samples, not percentiles.",
+    "HS256 fixture auth can call getUser from getClaims; deployed asymmetric JWT verification differs.",
+    "New-project route now includes discovery absent in baseline.",
+    "Navigation request counts may include concurrent repository discovery.",
+    "Database HTTP durations include the local fixture gateway, not hosted SQL execution time.",
+    "DOM interactive and long tasks do not isolate hydration cost.",
+    "Event durations are lab samples, not field INP."
+  ],
+  "before-auth": [
+    {
+      "operation": "/app",
+      "ttfbMs": 38,
+      "domInteractiveMs": 44,
+      "lcpMs": 52,
+      "longTaskDurationMs": 0,
+      "encodedJsBytes": 215307,
+      "decodedJsBytes": 695719,
+      "backendRequests": 23,
+      "authUserRequests": 14,
+      "bootstrapCalls": 1,
+      "maxDatabaseHttpMs": 5
+    },
+    {
+      "operation": "/app/projects/new",
+      "ttfbMs": 33,
+      "domInteractiveMs": 41,
+      "lcpMs": 52,
+      "longTaskDurationMs": 0,
+      "encodedJsBytes": 215743,
+      "decodedJsBytes": 696981,
+      "backendRequests": 17,
+      "authUserRequests": 8,
+      "bootstrapCalls": 1,
+      "maxDatabaseHttpMs": 7
+    },
+    {
+      "operation": "/app/runs",
+      "ttfbMs": 35,
+      "domInteractiveMs": 42,
+      "lcpMs": 48,
+      "longTaskDurationMs": 0,
+      "encodedJsBytes": 215102,
+      "decodedJsBytes": 694103,
+      "backendRequests": 15,
+      "authUserRequests": 6,
+      "bootstrapCalls": 1,
+      "maxDatabaseHttpMs": 7
+    },
+    {
+      "operation": "client navigation to New project",
+      "interactionMs": 72,
+      "backendRequests": 7,
+      "authUserRequests": 7,
+      "bootstrapCalls": 0,
+      "maxDatabaseHttpMs": 0
+    },
+    {
+      "operation": "create project without repository",
+      "interactionMs": 108,
+      "backendRequests": 19,
+      "authUserRequests": 7,
+      "bootstrapCalls": 2,
+      "maxDatabaseHttpMs": 5
+    }
+  ],
+  "after-desktop": [
+    {
+      "operation": "/app",
+      "ttfbMs": 14,
+      "domInteractiveMs": 19,
+      "lcpMs": 28,
+      "longTaskDurationMs": 0,
+      "encodedJsBytes": 191153,
+      "decodedJsBytes": 628911,
+      "backendRequests": 9,
+      "authUserRequests": 2,
+      "bootstrapCalls": 0,
+      "maxDatabaseHttpMs": 5
+    },
+    {
+      "operation": "/app/projects/new",
+      "ttfbMs": 18,
+      "domInteractiveMs": 27,
+      "lcpMs": 40,
+      "longTaskDurationMs": 0,
+      "encodedJsBytes": 192792,
+      "decodedJsBytes": 633745,
+      "backendRequests": 16,
+      "authUserRequests": 4,
+      "bootstrapCalls": 0,
+      "maxDatabaseHttpMs": 6
+    },
+    {
+      "operation": "/app/runs",
+      "ttfbMs": 17,
+      "domInteractiveMs": 27,
+      "lcpMs": 40,
+      "longTaskDurationMs": 0,
+      "encodedJsBytes": 190990,
+      "decodedJsBytes": 627273,
+      "backendRequests": 9,
+      "authUserRequests": 2,
+      "bootstrapCalls": 0,
+      "maxDatabaseHttpMs": 5
+    },
+    {
+      "operation": "client navigation projects to new project",
+      "interactionMs": 77,
+      "backendRequests": 3,
+      "authUserRequests": 3,
+      "bootstrapCalls": 0,
+      "maxDatabaseHttpMs": 0
+    },
+    {
+      "operation": "create project without repository",
+      "interactionMs": 62,
+      "maxObservedEventDurationMs": 24,
+      "backendRequests": 5,
+      "authUserRequests": 3,
+      "bootstrapCalls": 0,
+      "maxDatabaseHttpMs": 2
+    }
+  ],
+  "after-mobile": [
+    {
+      "operation": "/app",
+      "ttfbMs": 11,
+      "domInteractiveMs": 17,
+      "lcpMs": 24,
+      "longTaskDurationMs": 0,
+      "encodedJsBytes": 191153,
+      "decodedJsBytes": 628911,
+      "backendRequests": 9,
+      "authUserRequests": 2,
+      "bootstrapCalls": 0,
+      "maxDatabaseHttpMs": 4
+    },
+    {
+      "operation": "/app/projects/new",
+      "ttfbMs": 23,
+      "domInteractiveMs": 33,
+      "lcpMs": 44,
+      "longTaskDurationMs": 0,
+      "encodedJsBytes": 192792,
+      "decodedJsBytes": 633745,
+      "backendRequests": 16,
+      "authUserRequests": 4,
+      "bootstrapCalls": 0,
+      "maxDatabaseHttpMs": 5
+    },
+    {
+      "operation": "/app/runs",
+      "ttfbMs": 30,
+      "domInteractiveMs": 40,
+      "lcpMs": 48,
+      "longTaskDurationMs": 0,
+      "encodedJsBytes": 190990,
+      "decodedJsBytes": 627273,
+      "backendRequests": 9,
+      "authUserRequests": 2,
+      "bootstrapCalls": 0,
+      "maxDatabaseHttpMs": 8
+    },
+    {
+      "operation": "client navigation projects to new project",
+      "interactionMs": 74,
+      "backendRequests": 5,
+      "authUserRequests": 3,
+      "bootstrapCalls": 0,
+      "maxDatabaseHttpMs": 1
+    },
+    {
+      "operation": "create project without repository",
+      "interactionMs": 64,
+      "maxObservedEventDurationMs": 16,
+      "backendRequests": 5,
+      "authUserRequests": 3,
+      "bootstrapCalls": 0,
+      "maxDatabaseHttpMs": 2
+    }
+  ]
+}

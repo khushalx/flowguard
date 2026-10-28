@@ -11,22 +11,26 @@ import { AppError, dbCheck, internalRedirect } from "@/lib/server/http";
 export async function GET(request: Request) {
   const store = await cookies();
   const saved = store.get("fg_install_state")?.value;
-  store.set("fg_install_state", "", {
-    path: "/api/github",
-    maxAge: 0,
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-  });
   let destination = "/app/connections";
   try {
     const context = await requireWorkspace(true);
     const url = new URL(request.url);
     const state = url.searchParams.get("state");
+    // GitHub may omit state on an installation-settings update. Do not claim
+    // the supplied ID: navigate to a fresh, independently verified discovery.
+    if (!state && url.searchParams.get("setup_action") === "update")
+      return internalRedirect("/app/connections?github=check");
     if (!saved || !state || !sameSecret(saved, state))
       throw new AppError(
         "Installation state expired. Start the connection again.",
       );
+    store.set("fg_install_state", "", {
+      path: "/api/github",
+      maxAge: 0,
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+    });
     const result = await adminClient().rpc("consume_installation_state", {
       hash: hashState(state),
       uid: context.user.id,
@@ -36,6 +40,10 @@ export async function GET(request: Request) {
     if (!claim || claim.workspace_id !== context.workspaceId)
       throw new AppError("Installation state was already used or expired.");
     destination = safeReturnTo(claim.return_to);
+    if (!url.searchParams.get("installation_id"))
+      throw new AppError(
+        "No repository access was granted. Connect repositories when you’re ready.",
+      );
     const id = z.coerce
       .number()
       .int()

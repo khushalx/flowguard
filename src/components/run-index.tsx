@@ -6,7 +6,9 @@ import type { RunStatus } from "@/lib/model";
 import { EmptyState, PageHeader, WorkspaceLoading } from "./ui";
 import { RunList } from "./rows";
 export function RunIndex() {
-  const { workspace: w, data } = useWorkspace();
+  const { workspace: w, data, runsHasMore, loadMoreRuns } = useWorkspace();
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<RunStatus | "all">("all");
   if (!w) return <WorkspaceLoading />;
@@ -105,6 +107,40 @@ export function RunIndex() {
           title="Your run history will appear here"
           description="Configure a project and its journeys first. This frontend does not execute tests yet, so no results have been created."
         />
+      )}
+      {runsHasMore && (
+        <div className="load-more-runs">
+          <p className="field-hint">
+            Showing loaded runs. Load earlier runs to include them in search and
+            filters.
+          </p>
+          <button
+            className="button secondary"
+            disabled={loadingMore}
+            onClick={async () => {
+              setLoadingMore(true);
+              setLoadError(null);
+              try {
+                await loadMoreRuns();
+              } catch (e) {
+                setLoadError(
+                  e instanceof Error
+                    ? e.message
+                    : "Earlier runs could not be loaded.",
+                );
+              } finally {
+                setLoadingMore(false);
+              }
+            }}
+          >
+            {loadingMore ? "Loading…" : "Load earlier runs"}
+          </button>
+          {loadError && (
+            <p className="form-error" role="alert">
+              {loadError}
+            </p>
+          )}
+        </div>
       )}
     </>
   );

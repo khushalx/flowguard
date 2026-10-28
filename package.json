@@ -9,6 +9,7 @@
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test:e2e": "playwright test",
+    "test:server": "node --conditions=react-server --import tsx --test tests/server/*.test.ts",
     "test:security": "node --import tsx --test tests/security/*.test.ts",
     "test:integration": "playwright test --config playwright.integration.config.ts"
   },

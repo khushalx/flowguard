@@ -37,10 +37,12 @@ before(async () => {
     grant usage on schema auth to authenticated,service_role;grant execute on function auth.uid() to authenticated,service_role;
     insert into auth.users values('${alice}'),('${bob}'),('${eve}');
     insert into auth.identities values('${alice}','github','1001','{"user_name":"alice","full_name":"Alice"}'),('${bob}','github','1002','{"user_name":"bob"}');`);
-  const file = readdirSync("supabase/migrations").find((f) =>
-    f.endsWith("_phase_two_foundation.sql"),
-  )!;
-  await db.exec(readFileSync(`supabase/migrations/${file}`, "utf8"));
+  await db.exec("create function public.rls_auto_enable() returns event_trigger language plpgsql security definer as $$ begin return; end; $$");
+  for (const file of readdirSync("supabase/migrations")
+    .filter((f) => f.endsWith(".sql"))
+    .sort()) {
+    await db.exec(readFileSync(`supabase/migrations/${file}`, "utf8"));
+  }
   await asUser(alice);
   aw = await scalar("select public.bootstrap_workspace()");
   ap = await scalar(
@@ -87,6 +89,45 @@ test("bootstrap is idempotent and requires a trusted GitHub identity", async () 
     db.query("select public.bootstrap_workspace()"),
     /Verified GitHub identity/,
   );
+});
+test("workspace context is read-only, RLS-bound and unavailable to anonymous callers", async () => {
+  await asUser(alice);
+  const before = await scalar(
+    `select updated_at::text from public.profiles where id='${alice}'`,
+  );
+  for (let i = 0; i < 3; i++) {
+    const result = await db.query<{ id: string; role: string }>(
+      "select * from public.workspace_context()",
+    );
+    assert.equal(result.rows.length, 1);
+    assert.equal(result.rows[0].id, aw);
+    assert.equal(result.rows[0].role, "owner");
+  }
+  assert.equal(
+    await scalar(
+      `select updated_at::text from public.profiles where id='${alice}'`,
+    ),
+    before,
+  );
+  assert.equal(
+    await scalar(
+      `select count(*)::text from public.latest_workspace_runs('${bw}')`,
+    ),
+    "0",
+  );
+  await asUser(bob);
+  assert.equal(await scalar("select id from public.workspace_context()"), bw);
+  await root();
+  await db.exec("set role anon");
+  await assert.rejects(
+    db.query("select * from public.workspace_context()"),
+    /permission denied/,
+  );
+});
+test("optional hosted auto-RLS helper stays outside the client RPC privileges",async()=>{
+  await root();
+  for(const role of ["anon","authenticated"])
+    assert.equal(await scalar(`select has_function_privilege('${role}','public.rls_auto_enable()','execute')`),false);
 });
 test("profiles are private; verified GitHub ID and owner identity are immutable", async () => {
   await asUser(alice);

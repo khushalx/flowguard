@@ -1,5 +1,10 @@
 import "server-only";
-import { workspaceSchema, type Project, type Journey } from "../model";
+import {
+  workspaceSchema,
+  runSchema,
+  type Project,
+  type Journey,
+} from "../model";
 import {
   mutationSchema,
   type Repository,
@@ -12,33 +17,36 @@ import { verifyRepositoryAccess } from "./github";
 
 type Context = Awaited<ReturnType<typeof requireWorkspace>>;
 export async function readWorkspace(context: Context) {
-  const { db, user, workspaceId, role } = context;
+  const { db, user, workspaceId, role, member } = context;
   const results = await Promise.all([
     db
       .from("projects")
-      .select("*")
+      .select("id,name,target_url,description,repository_id,created_at")
       .eq("workspace_id", workspaceId)
       .order("created_at"),
     db
       .from("journeys")
-      .select("*,projects!inner(workspace_id)")
+      .select(
+        "id,project_id,name,start_path,success_condition,created_at,projects!inner(workspace_id)",
+      )
       .eq("projects.workspace_id", workspaceId)
       .order("created_at"),
+    readInitialRuns(context),
     db
-      .from("runs")
-      .select("*,run_steps(*),projects!inner(workspace_id)")
-      .eq("projects.workspace_id", workspaceId)
-      .order("started_at", { ascending: false }),
-    db.from("repositories").select("*").eq("workspace_id", workspaceId),
+      .from("repositories")
+      .select("id,full_name,is_private,default_branch,sync_status")
+      .eq("workspace_id", workspaceId),
     db
       .from("github_installations")
-      .select("id,github_account_login,installation_status,needs_sync")
+      .select(
+        "id,github_installation_id,github_account_login,installation_status,needs_sync",
+      )
       .eq("workspace_id", workspaceId),
-    db.from("profiles").select("*").eq("id", user.id).single(),
-    db.from("workspaces").select("name").eq("id", workspaceId).single(),
   ]);
-  results.forEach((r) => dbCheck(r.error));
-  const [projects, journeys, runs, repos, installations, profile, ws] = results;
+  results.forEach((r) => {
+    if ("error" in r) dbCheck(r.error);
+  });
+  const [projects, journeys, runs, repos, installations] = results;
   const repositories: Repository[] = (repos.data ?? []).map((r) => ({
     id: r.id,
     fullName: r.full_name,
@@ -65,53 +73,17 @@ export async function readWorkspace(context: Context) {
       condition: j.success_condition,
       createdAt: j.created_at,
     })),
-    runs: (runs.data ?? []).map((r) => ({
-      id: r.id,
-      number: r.number,
-      projectId: r.project_id,
-      journeyId: r.journey_id ?? "",
-      journeyName: r.journey_name,
-      status: r.status,
-      startedAt: r.started_at,
-      duration: r.duration_ms,
-      branch: r.branch ?? "",
-      commit: r.commit_sha ?? "",
-      commitMessage: r.commit_message ?? "",
-      environment: r.environment ?? "",
-      browser: r.browser ?? "",
-      steps: (r.run_steps ?? [])
-        .sort(
-          (a: { sequence_number: number }, b: { sequence_number: number }) =>
-            a.sequence_number - b.sequence_number,
-        )
-        .map(
-          (s: {
-            name: string;
-            status: string;
-            error_message: string | null;
-            metadata: Record<string, unknown>;
-          }) => ({
-            name: s.name,
-            status: s.status,
-            detail: s.error_message ?? "",
-            duration:
-              typeof s.metadata.duration_ms === "number"
-                ? s.metadata.duration_ms
-                : null,
-          }),
-        ),
-      logs: [],
-    })),
+    runs: runs.runs,
   });
-  const avatar = profile.data?.avatar_url;
+  const avatar = member.avatar_url;
   const info: WorkspaceInfo = {
     id: workspaceId,
-    name: ws.data!.name,
+    name: member.name,
     role,
     account: {
       id: user.id,
-      name: profile.data?.full_name || profile.data?.username || "Your account",
-      username: profile.data?.username ?? null,
+      name: member.full_name || member.username || "Your account",
+      username: member.username ?? null,
       email: user.email ?? null,
       avatar:
         typeof avatar === "string" &&
@@ -122,6 +94,8 @@ export async function readWorkspace(context: Context) {
   };
   return {
     workspace,
+    runsHasMore: runs.hasMore,
+    runOffset: runs.offset,
     info,
     repositories,
     installations: (installations.data ?? []).map((i) => ({
@@ -129,6 +103,7 @@ export async function readWorkspace(context: Context) {
       account: i.github_account_login,
       status: i.installation_status,
       needsSync: i.needs_sync,
+      managementUrl: `https://github.com/settings/installations/${i.github_installation_id}`,
     })) as Installation[],
   };
 }
@@ -154,8 +129,15 @@ export async function mutateWorkspace(raw: unknown, context: Context) {
     mutation.action === "updateProject"
   ) {
     const { input } = mutation;
-    if (input.repositoryId)
+    const current =
+      mutation.action === "updateProject"
+        ? await ownedProject(mutation.id)
+        : null;
+    if (input.repositoryId && input.repositoryId !== current?.repository_id)
       await verifyRepositoryAccess(context, input.repositoryId);
+    const repository = input.repositoryId
+      ? await repositoryName(context, input.repositoryId)
+      : "";
     const values = {
       workspace_id: workspaceId,
       name: input.name,
@@ -164,7 +146,6 @@ export async function mutateWorkspace(raw: unknown, context: Context) {
       repository_id: input.repositoryId,
     };
     if (mutation.action === "updateProject") {
-      await ownedProject(mutation.id);
       // Workspace ID is immutable; the server never accepts it from the client.
       const { workspace_id: _workspace, ...patch } = values;
       void _workspace;
@@ -173,18 +154,24 @@ export async function mutateWorkspace(raw: unknown, context: Context) {
         .update(patch)
         .eq("id", mutation.id)
         .eq("workspace_id", workspaceId)
-        .select("id")
+        .select("*")
         .single();
       dbCheck(result.error);
-      return { id: result.data!.id as string };
+      return {
+        id: result.data!.id as string,
+        project: projectRecord(result.data!, repository),
+      };
     }
     const result = await db
       .from("projects")
       .insert(values)
-      .select("id")
+      .select("*")
       .single();
     dbCheck(result.error);
-    return { id: result.data!.id as string };
+    return {
+      id: result.data!.id as string,
+      project: projectRecord(result.data!, repository),
+    };
   }
   if (mutation.action === "deleteProject") {
     await ownedProject(mutation.id);
@@ -214,11 +201,14 @@ export async function mutateWorkspace(raw: unknown, context: Context) {
           })
           .eq("id", mutation.id)
           .eq("project_id", values.project_id)
-          .select("id")
+          .select("*")
           .single()
-      : await db.from("journeys").insert(values).select("id").single();
+      : await db.from("journeys").insert(values).select("*").single();
     dbCheck(result.error);
-    return { id: result.data!.id as string };
+    return {
+      id: result.data!.id as string,
+      journey: journeyRecord(result.data!),
+    };
   }
   if (mutation.action === "deleteJourney") {
     const found = await db
@@ -257,4 +247,168 @@ export async function mutateWorkspace(raw: unknown, context: Context) {
   });
   dbCheck(result.error);
   return { id: workspaceId };
+}
+
+export async function readConnections(context: Context) {
+  const [repos, installs] = await Promise.all([
+    context.db
+      .from("repositories")
+      .select("id,full_name,is_private,default_branch,sync_status")
+      .eq("workspace_id", context.workspaceId)
+      .order("full_name"),
+    context.db
+      .from("github_installations")
+      .select(
+        "id,github_installation_id,github_account_login,installation_status,needs_sync",
+      )
+      .eq("workspace_id", context.workspaceId),
+  ]);
+  dbCheck(repos.error);
+  dbCheck(installs.error);
+  return {
+    repositories: (repos.data ?? []).map((r) => ({
+      id: r.id,
+      fullName: r.full_name,
+      private: r.is_private,
+      defaultBranch: r.default_branch,
+      status: r.sync_status,
+    })) as Repository[],
+    installations: (installs.data ?? []).map((i) => ({
+      id: i.id,
+      account: i.github_account_login,
+      status: i.installation_status,
+      needsSync: i.needs_sync,
+      managementUrl: `https://github.com/settings/installations/${i.github_installation_id}`,
+    })) as Installation[],
+  };
+}
+async function repositoryName(context: Context, id: string) {
+  const r = await context.db
+    .from("repositories")
+    .select("full_name")
+    .eq("id", id)
+    .eq("workspace_id", context.workspaceId)
+    .single();
+  dbCheck(r.error);
+  return r.data!.full_name as string;
+}
+function projectRecord(p: Record<string, unknown>, repository: string) {
+  return {
+    id: p.id,
+    name: p.name,
+    url: p.target_url,
+    description: p.description,
+    repositoryId: p.repository_id,
+    createdAt: p.created_at,
+    repository,
+  } as Project;
+}
+function journeyRecord(j: Record<string, unknown>) {
+  return {
+    id: j.id,
+    projectId: j.project_id,
+    name: j.name,
+    path: j.start_path,
+    condition: j.success_condition,
+    createdAt: j.created_at,
+  } as Journey;
+}
+
+const runColumns =
+  "id,number,project_id,journey_id,journey_name,status,started_at,duration_ms,branch,commit_sha,commit_message,environment,browser";
+async function readInitialRuns(context: Context) {
+  const [page, latest] = await Promise.all([
+    readRunPage(context),
+    context.db
+      .rpc("latest_workspace_runs", { wid: context.workspaceId })
+      .select(runColumns),
+  ]);
+  dbCheck(latest.error);
+  if (latest.data && !Array.isArray(latest.data))
+    throw new AppError("Run summaries could not be loaded. Try again.", 503);
+  const known = new Set(page.runs.map((r) => r.id));
+  return {
+    ...page,
+    offset: page.runs.length,
+    runs: [
+      ...page.runs,
+      ...(Array.isArray(latest.data) ? latest.data : [])
+        .map(runRecord)
+        .filter((r) => !known.has(r.id)),
+    ],
+  };
+}
+export async function readRunPage(context: Context, offset = 0) {
+  const result = await context.db
+    .from("runs")
+    .select(`${runColumns},projects!inner(workspace_id)`)
+    .eq("projects.workspace_id", context.workspaceId)
+    .order("started_at", { ascending: false })
+    .order("id", { ascending: false })
+    .range(offset, offset + 50);
+  dbCheck(result.error);
+  return {
+    runs: (result.data ?? []).slice(0, 50).map(runRecord),
+    hasMore: (result.data?.length ?? 0) > 50,
+  };
+}
+export async function readRun(context: Context, id: string) {
+  const result = await context.db
+    .from("runs")
+    .select(
+      `${runColumns},run_steps(name,status,error_message,metadata,sequence_number),projects!inner(workspace_id)`,
+    )
+    .eq("id", id)
+    .eq("projects.workspace_id", context.workspaceId)
+    .maybeSingle();
+  dbCheck(result.error);
+  if (!result.data) throw new AppError("Run not found in this workspace.", 404);
+  return runRecord(result.data);
+}
+function runRecord(r: Record<string, unknown>) {
+  return runSchema.parse({
+    id: r.id,
+    number: r.number,
+    projectId: r.project_id,
+    journeyId: r.journey_id ?? "",
+    journeyName: r.journey_name,
+    status: r.status,
+    startedAt: r.started_at,
+    duration: r.duration_ms,
+    branch: r.branch ?? "",
+    commit: r.commit_sha ?? "",
+    commitMessage: r.commit_message ?? "",
+    environment: r.environment ?? "",
+    browser: r.browser ?? "",
+    steps: (
+      (r.run_steps ?? []) as {
+        sequence_number: number;
+        name: string;
+        status: string;
+        error_message: string | null;
+        metadata: Record<string, unknown>;
+      }[]
+    )
+      .sort(
+        (a: { sequence_number: number }, b: { sequence_number: number }) =>
+          a.sequence_number - b.sequence_number,
+      )
+      .map(
+        (s: {
+          name: string;
+          status: string;
+          error_message: string | null;
+          metadata: Record<string, unknown>;
+        }) => ({
+          name: s.name,
+          status: s.status,
+          detail: s.error_message ?? "",
+          duration:
+            typeof s.metadata.duration_ms === "number"
+              ? s.metadata.duration_ms
+              : null,
+        }),
+      ),
+    logs: [],
+  });
 }
