@@ -88,7 +88,7 @@ test("mocked GitHub PKCE sign-in creates a real SQL workspace; CRUD persists, im
     .click();
   await page.getByLabel("Journey name").fill("Persistent login");
   await page.getByLabel("Start path or URL").fill("/login");
-  await page.getByLabel("Success condition").fill("Dashboard is visible");
+  await page.getByLabel("Expected value").fill("Dashboard is visible");
   await page
     .getByRole("dialog")
     .getByRole("button", { name: "Create journey", exact: true })
@@ -114,9 +114,12 @@ test("mocked GitHub PKCE sign-in creates a real SQL workspace; CRUD persists, im
   });
   await page.getByRole("button", { name: "Run tests", exact: true }).click();
   await expect(page.getByRole("dialog")).toContainText(
-    "Test execution isn’t connected yet",
+    "Connect a repository in project settings before running tests.",
   );
-  await page.getByRole("button", { name: /Got it/ }).click();
+  await expect(
+    page.getByRole("button", { name: "Run 1 journey", exact: true }),
+  ).toBeDisabled();
+  await page.getByRole("button", { name: "Close dialog", exact: true }).click();
   const denied = await page.evaluate(async () => {
     const response = await fetch("/api/workspace", {
       method: "POST",

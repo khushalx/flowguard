@@ -14,6 +14,7 @@ import {
 import { requireWorkspace } from "./auth";
 import { AppError, dbCheck } from "./http";
 import { verifyRepositoryAccess } from "./github";
+import { journeyDefinitionSchema } from "../../../packages/runner/src/schema";
 
 type Context = Awaited<ReturnType<typeof requireWorkspace>>;
 export async function readWorkspace(context: Context) {
@@ -27,7 +28,7 @@ export async function readWorkspace(context: Context) {
     db
       .from("journeys")
       .select(
-        "id,project_id,name,start_path,success_condition,created_at,projects!inner(workspace_id)",
+        "id,project_id,name,start_path,success_condition,configuration,enabled,created_at,projects!inner(workspace_id)",
       )
       .eq("projects.workspace_id", workspaceId)
       .order("created_at"),
@@ -71,6 +72,8 @@ export async function readWorkspace(context: Context) {
       name: j.name,
       path: j.start_path,
       condition: j.success_condition,
+      definition: journeyDefinitionSchema.safeParse(j.configuration).data,
+      enabled: j.enabled,
       createdAt: j.created_at,
     })),
     runs: runs.runs,
@@ -190,6 +193,8 @@ export async function mutateWorkspace(raw: unknown, context: Context) {
       name: mutation.input.name,
       start_path: mutation.input.path,
       success_condition: mutation.input.condition,
+      configuration: mutation.input.definition ?? {},
+      enabled: mutation.input.enabled ?? true,
     };
     const result = mutation.id
       ? await db
@@ -198,6 +203,8 @@ export async function mutateWorkspace(raw: unknown, context: Context) {
             name: values.name,
             start_path: values.start_path,
             success_condition: values.success_condition,
+            configuration: values.configuration,
+            enabled: values.enabled,
           })
           .eq("id", mutation.id)
           .eq("project_id", values.project_id)
@@ -310,12 +317,14 @@ function journeyRecord(j: Record<string, unknown>) {
     name: j.name,
     path: j.start_path,
     condition: j.success_condition,
+    definition: journeyDefinitionSchema.safeParse(j.configuration).data,
+    enabled: j.enabled,
     createdAt: j.created_at,
   } as Journey;
 }
 
 const runColumns =
-  "id,number,project_id,journey_id,journey_name,status,started_at,duration_ms,branch,commit_sha,commit_message,environment,browser";
+  "id,number,project_id,journey_id,journey_name,status,started_at,duration_ms,branch,commit_sha,commit_message,environment,browser,batch_id,failure_category,error_message";
 async function readInitialRuns(context: Context) {
   const [page, latest] = await Promise.all([
     readRunPage(context),
@@ -356,14 +365,36 @@ export async function readRun(context: Context, id: string) {
   const result = await context.db
     .from("runs")
     .select(
-      `${runColumns},run_steps(name,status,error_message,metadata,sequence_number),projects!inner(workspace_id)`,
+      `${runColumns},logs,assertion,run_steps(name,status,error_message,metadata,sequence_number),projects!inner(workspace_id)`,
     )
     .eq("id", id)
     .eq("projects.workspace_id", context.workspaceId)
     .maybeSingle();
   dbCheck(result.error);
   if (!result.data) throw new AppError("Run not found in this workspace.", 404);
-  return runRecord(result.data);
+  const run = runRecord(result.data);
+  if (result.data.batch_id) {
+    const [artifact, batch] = await Promise.all([
+      context.db
+        .from("run_artifacts")
+        .select("id,expires_at")
+        .eq("run_id", id)
+        .eq("uploaded", true)
+        .maybeSingle(),
+      context.db
+        .from("execution_batches")
+        .select("repository_name,github_run_id")
+        .eq("id", result.data.batch_id)
+        .maybeSingle(),
+    ]);
+    dbCheck(artifact.error);
+    dbCheck(batch.error);
+    if (artifact.data && Date.parse(artifact.data.expires_at) > Date.now())
+      run.screenshot = `/api/runs/${id}/screenshot`;
+    if (batch.data?.github_run_id)
+      run.githubUrl = `https://github.com/${batch.data.repository_name}/actions/runs/${batch.data.github_run_id}`;
+  }
+  return run;
 }
 function runRecord(r: Record<string, unknown>) {
   return runSchema.parse({
@@ -409,6 +440,10 @@ function runRecord(r: Record<string, unknown>) {
               : null,
         }),
       ),
-    logs: [],
+    logs: r.logs ?? [],
+    assertion: r.assertion ?? undefined,
+    batchId: r.batch_id ?? undefined,
+    failureCategory: r.failure_category ?? undefined,
+    error: r.error_message ?? undefined,
   });
 }

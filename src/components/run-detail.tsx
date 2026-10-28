@@ -1,12 +1,11 @@
 "use client";
 import Link from "./workspace-link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ChevronDown, Copy, GitCommitHorizontal, Play } from "lucide-react";
 import { duration, host } from "@/lib/model";
 import { useWorkspace } from "@/lib/workspace-store";
 import { useFeedback } from "./feedback";
 import {
-  ExecutionDialog,
   MissingRecord,
   PageHeader,
   StatusIndicator,
@@ -14,29 +13,47 @@ import {
   EmptyState,
 } from "./ui";
 import { Investigation } from "./investigation";
+import { ExecutionLauncher } from "./execution-dialog";
 
 export function RunDetail({ id }: { id: string }) {
   const { workspace: w, data, isLive, loadRun } = useWorkspace();
   const [ready, setReady] = useState(!isLive);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const currentStatus = w?.runs.find((r) => r.id === id)?.status;
+  const polls = useRef(0);
   useEffect(() => {
     if (!isLive) return;
     let active = true;
-    loadRun(id)
-      .then(() => {
-        if (active) setReady(true);
-      })
-      .catch((e) => {
-        if (active)
-          setError(
-            e instanceof Error ? e.message : "Run details could not be loaded.",
-          );
-      });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    function poll() {
+      void loadRun(id)
+        .then(() => {
+          if (active) {
+            setReady(true);
+            polls.current++;
+            if (
+              ["queued", "running"].includes(currentStatus || "") &&
+              polls.current < 180
+            )
+              timer = setTimeout(poll, 5000);
+          }
+        })
+        .catch((e) => {
+          if (active)
+            setError(
+              e instanceof Error
+                ? e.message
+                : "Run details could not be loaded.",
+            );
+        });
+    }
+    poll();
     return () => {
       active = false;
+      clearTimeout(timer);
     };
-  }, [id, isLive, loadRun, attempt]);
+  }, [id, isLive, loadRun, attempt, currentStatus]);
   const [execution, setExecution] = useState(false);
   const notify = useFeedback();
   if (error)
@@ -126,30 +143,63 @@ export function RunDetail({ id }: { id: string }) {
         <StatusIndicator
           status={run.status}
           label={
-            run.status === "failed"
-              ? "Run failed"
-              : run.status === "passed"
-                ? "Run passed"
-                : run.status === "running"
-                  ? "Running · sample state"
-                  : "Result unknown"
+            isLive
+              ? undefined
+              : run.status === "failed"
+                ? "Run failed"
+                : run.status === "passed"
+                  ? "Run passed"
+                  : run.status === "running"
+                    ? "Running · sample state"
+                    : "Result unknown"
           }
           large
         />
         <p>
-          {run.status === "failed"
-            ? `${run.steps.filter((s) => s.status === "passed").length} steps passed before the assertion failed.`
-            : run.status === "passed"
-              ? `All ${run.steps.length} recorded steps passed.`
-              : run.status === "running"
-                ? "Static demo record. No test is currently being executed."
-                : "This sample record has no completed execution result."}
+          {isLive
+            ? run.error ||
+              (run.status === "passed"
+                ? `All ${run.steps.length} recorded steps passed.`
+                : run.status === "queued"
+                  ? "Waiting for the verified GitHub Actions runner to begin."
+                  : run.status === "running"
+                    ? "The runner has started this journey. Refreshing recorded state."
+                    : "Inspect the recorded steps and failure details.")
+            : run.status === "failed"
+              ? `${run.steps.filter((s) => s.status === "passed").length} steps passed before the assertion failed.`
+              : run.status === "passed"
+                ? `All ${run.steps.length} recorded steps passed.`
+                : run.status === "running"
+                  ? "Static demo record. No test is currently being executed."
+                  : "This sample record has no completed execution result."}
         </p>
         <span className="mono">{duration(run.duration)}</span>
         <span className="neutral-tag">
           {data?.mode === "demo" ? "Demo result" : "Recorded result"}
         </span>
       </div>
+      {run.failureCategory && (
+        <p className="info-panel">
+          Failure category: {run.failureCategory.replaceAll("_", " ")}
+        </p>
+      )}
+      {run.batchId && (
+        <div className="page-actions">
+          <Link className="text-link" href={`/app/executions/${run.batchId}`}>
+            Execution overview
+          </Link>
+          {run.githubUrl && (
+            <a
+              className="text-link"
+              href={`${run.githubUrl}#artifacts`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              GitHub Actions & trace artifacts
+            </a>
+          )}
+        </div>
+      )}
       <Investigation key={run.id} run={run} />
       <details className="run-metadata-disclosure">
         <summary>
@@ -194,12 +244,20 @@ export function RunDetail({ id }: { id: string }) {
             </div>
             <p>{run.commitMessage}</p>
             <span className="muted small-text">
-              Repository reference only. No GitHub connection.
+              {isLive
+                ? "Commit and branch reported by the verified GitHub workflow."
+                : "Repository reference only. No GitHub connection."}
             </span>
           </div>
         </div>
       </details>
-      {execution && <ExecutionDialog onClose={() => setExecution(false)} />}
+      {execution && (
+        <ExecutionLauncher
+          project={project}
+          journeyId={run.journeyId || undefined}
+          onClose={() => setExecution(false)}
+        />
+      )}
     </>
   );
 }

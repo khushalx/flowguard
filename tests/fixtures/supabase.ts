@@ -46,6 +46,7 @@ const session = () => ({
 const codes = new Map<string, string>();
 let revoked = false;
 let githubMode = "missing";
+let lastBatchId = "";
 
 async function main() {
   await db.exec(
@@ -73,6 +74,8 @@ async function main() {
       "profiles",
       "workspaces",
       "workspace_members",
+      "execution_batches",
+      "run_artifacts",
     ];
     if (!allowed.includes(table)) throw new Error("Unsupported fixture table");
     const values: unknown[] = [];
@@ -196,6 +199,9 @@ async function main() {
       res.end(JSON.stringify(data));
     };
     try {
+      let raw = "";
+      for await (const part of req) raw += part;
+      const body = raw ? JSON.parse(raw) : {};
       if (url.pathname === "/health") return send(200, { ok: true });
       if (url.pathname === "/test/github-mode") {
         githubMode = url.searchParams.get("mode") ?? "missing";
@@ -203,6 +209,38 @@ async function main() {
       }
       if (url.pathname.startsWith("/github/")) {
         const path = url.pathname.slice(7);
+        if (githubMode.startsWith("actions")) {
+          if (path.endsWith("/dispatches")) {
+            if (githubMode === "actions-dispatch-failed")
+              return send(503, { message: "Dispatch unavailable" });
+            lastBatchId = (body.inputs as { batch_id: string }).batch_id;
+            return send(200, { workflow_run_id: 555 });
+          }
+          if (path.includes("/actions/runs/555"))
+            return send(200, {
+              id: 555,
+              repository: { id: 456 },
+              event: "workflow_dispatch",
+              head_branch: "main",
+              head_sha: "a".repeat(40),
+              workflow_id: 77,
+              display_title: `FlowGuard ${lastBatchId}`,
+              status:
+                githubMode === "actions-completed"
+                  ? "completed"
+                  : "in_progress",
+              conclusion: githubMode === "actions-completed" ? "failure" : null,
+              updated_at: new Date(Date.now() - 60000).toISOString(),
+            });
+          if (path.includes("/actions/workflows/"))
+            return send(200, {
+              id: 77,
+              state: "active",
+              path: ".github/workflows/flowguard.yml",
+            });
+          if (path === "/repos/alice/repo-456")
+            return send(200, { id: 456, default_branch: "main" });
+        }
         if (path === "/user/1001")
           return send(200, { id: 1001, type: "User", login: "alice" });
         if (githubMode === "missing" || githubMode === "removed")
@@ -241,6 +279,10 @@ async function main() {
             login: "alice",
           },
           suspended_at: null,
+          permissions: {
+            metadata: "read",
+            ...(githubMode.startsWith("actions") ? { actions: "write" } : {}),
+          },
         });
       }
       if (url.pathname === "/test/seed-runs") {
@@ -272,6 +314,7 @@ async function main() {
         );
         revoked = false;
         githubMode = "missing";
+        lastBatchId = "";
         return send(200, { ok: true });
       }
       if (url.pathname === "/auth/v1/authorize") {
@@ -283,9 +326,7 @@ async function main() {
         res.writeHead(302, { Location: target.toString() });
         return res.end();
       }
-      let raw = "";
-      for await (const part of req) raw += part;
-      const body = raw ? JSON.parse(raw) : {};
+
       if (url.pathname === "/auth/v1/token") {
         if (url.searchParams.get("grant_type") === "pkce") {
           const challenge = codes.get(body.auth_code);
@@ -325,6 +366,13 @@ async function main() {
         await tx.query("select set_config('request.jwt.claim.sub',$1,true)", [
           uid,
         ]);
+        if (url.pathname === "/rest/v1/rpc/engine_operation")
+          return (
+            await tx.query<{ result: unknown }>(
+              "select public.engine_operation($1,$2) as result",
+              [body.op, JSON.stringify(body.args)],
+            )
+          ).rows[0].result;
         if (url.pathname === "/rest/v1/rpc/issue_installation_state") {
           await tx.query(
             "select public.issue_installation_state($1,$2,$3,$4)",

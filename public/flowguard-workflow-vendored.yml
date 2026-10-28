@@ -1,0 +1,55 @@
+name: FlowGuard
+run-name: FlowGuard ${{ inputs.batch_id }}
+on:
+  workflow_dispatch:
+    inputs:
+      batch_id:
+        description: Non-secret FlowGuard execution identifier
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: flowguard-browser-tests
+  cancel-in-progress: false
+jobs:
+  test:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # Vendor only packages/runner from a reviewed immutable FlowGuard commit
+      # into .flowguard/runner, including its lockfile. Record the source SHA.
+      - name: Fetch default-branch runner snapshot
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          sparse-checkout: .flowguard/runner
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+      - name: Install runner and Chromium
+        working-directory: .flowguard/runner
+        run: |
+          npm ci --ignore-scripts
+          npm run build
+          npx playwright install --with-deps chromium
+      - name: Execute and report real results
+        working-directory: .flowguard/runner
+        env:
+          FLOWGUARD_URL: ${{ vars.FLOWGUARD_URL }}
+          FLOWGUARD_BATCH_ID: ${{ inputs.batch_id }}
+          FLOWGUARD_RUNNER_TOKEN: ${{ secrets.FLOWGUARD_RUNNER_TOKEN }}
+          # Add only the test credentials referenced by your journeys.
+          FG_TEST_EMAIL: ${{ secrets.FG_TEST_EMAIL }}
+          FG_TEST_PASSWORD: ${{ secrets.FG_TEST_PASSWORD }}
+        run: npm start
+      - name: Preserve sanitized action traces on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: flowguard-traces-${{ inputs.batch_id }}
+          path: .flowguard/runner/artifacts/*.zip
+          if-no-files-found: ignore
+          retention-days: 7

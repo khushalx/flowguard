@@ -11,11 +11,14 @@
     "test:e2e": "playwright test",
     "test:server": "node --conditions=react-server --import tsx --test tests/server/*.test.ts",
     "test:security": "node --import tsx --test tests/security/*.test.ts",
-    "test:integration": "playwright test --config playwright.integration.config.ts"
+    "test:integration": "playwright test --config playwright.integration.config.ts",
+    "test:runner": "node --import tsx --test tests/runner/*.test.ts",
+    "runner:build": "npm --prefix packages/runner run build"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.7",
     "@supabase/supabase-js": "2.118.0",
+    "ipaddr.js": "2.2.0",
     "lucide-react": "^1.62.0",
     "next": "16.4.3",
     "octokit": "5.0.5",
@@ -35,6 +38,7 @@
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.4.3",
+    "fflate": "0.8.3",
     "prettier": "^3.9.10",
     "supabase": "2.122.0",
     "tailwindcss": "^4",

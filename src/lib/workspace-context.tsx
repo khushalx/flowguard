@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useContext } from "react";
-import type { Project, Journey, Workspace, Storage } from "./model";
+import type { Project, Journey, Workspace, Storage, Run } from "./model";
 import type { Repository, Installation, WorkspaceInfo } from "./contracts";
 import type { LiveSnapshot } from "./server/workspace";
 type Actions = {
@@ -34,6 +34,7 @@ export type State = {
   isLive: boolean;
   basePath: string;
   refresh: () => Promise<void>;
+  updateRunViews?: (runs: Run[]) => void;
 };
 export const Context = createContext<State | null>(null);
 

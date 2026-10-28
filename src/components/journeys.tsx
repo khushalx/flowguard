@@ -1,7 +1,7 @@
 "use client";
 import Link from "./workspace-link";
 import { useState, type FormEvent } from "react";
-import { ArrowUpRight, Pencil, Plus, Route, Trash2 } from "lucide-react";
+import { ArrowUpRight, Pencil, Plus, Route, Trash2, Play } from "lucide-react";
 import {
   latestRun,
   validPath,
@@ -12,8 +12,34 @@ import {
 import { useWorkspace } from "@/lib/workspace-store";
 import { errorMessage, useFeedback } from "./feedback";
 import { ConfirmDialog, Dialog, EmptyState, StatusIndicator } from "./ui";
+import { StructuredJourneyEditor } from "./structured-journey-editor";
+import { ExecutionLauncher } from "./execution-dialog";
 
 export function JourneyEditor({
+  project,
+  journey,
+  onClose,
+}: {
+  project: Project;
+  journey?: Journey;
+  onClose: () => void;
+}) {
+  const { isLive } = useWorkspace();
+  return isLive ? (
+    <StructuredJourneyEditor
+      project={project}
+      journey={journey}
+      onClose={onClose}
+    />
+  ) : (
+    <LegacyJourneyEditor
+      project={project}
+      journey={journey}
+      onClose={onClose}
+    />
+  );
+}
+function LegacyJourneyEditor({
   project,
   journey,
   onClose,
@@ -162,12 +188,15 @@ export function JourneyRow({
   run,
   onEdit,
   onDelete,
+  onRun,
 }: {
   journey: Journey;
   run?: Run;
   onEdit: () => void;
   onDelete: () => void;
+  onRun?: () => void;
 }) {
+  const { isLive } = useWorkspace();
   return (
     <li className="journey-row">
       <Route
@@ -180,6 +209,14 @@ export function JourneyRow({
         <h3>{journey.name}</h3>
         <p className="mono journey-path">{journey.path}</p>
         <p className="journey-condition">{journey.condition}</p>
+        {journey.enabled === false ? (
+          <span className="neutral-tag">Disabled</span>
+        ) : (
+          isLive &&
+          !journey.definition && (
+            <span className="neutral-tag">Needs configuration</span>
+          )
+        )}
       </div>
       <div className="journey-result">
         {run ? (
@@ -196,6 +233,16 @@ export function JourneyRow({
         )}
       </div>
       <div className="row-actions">
+        {onRun && (
+          <button
+            className="icon-button"
+            onClick={onRun}
+            aria-label={`Run ${journey.name}`}
+            title="Run this journey"
+          >
+            <Play size={15} />
+          </button>
+        )}
         <button
           className="icon-button"
           onClick={onEdit}
@@ -228,7 +275,8 @@ export function JourneysList({
 }) {
   const [editor, setEditor] = useState<Journey | "new" | null>(null);
   const [deleting, setDeleting] = useState<Journey | null>(null);
-  const { actions } = useWorkspace();
+  const [executing, setExecuting] = useState<Journey | null>(null);
+  const { actions, isLive } = useWorkspace();
   const notify = useFeedback();
   return (
     <>
@@ -241,6 +289,7 @@ export function JourneysList({
               run={latestRun(runs, project.id, j.id)}
               onEdit={() => setEditor(j)}
               onDelete={() => setDeleting(j)}
+              onRun={isLive ? () => setExecuting(j) : undefined}
             />
           ))}
         </ul>
@@ -266,6 +315,13 @@ export function JourneysList({
           project={project}
           journey={editor === "new" ? undefined : editor}
           onClose={() => setEditor(null)}
+        />
+      )}
+      {executing && (
+        <ExecutionLauncher
+          project={project}
+          journeyId={executing.id}
+          onClose={() => setExecuting(null)}
         />
       )}
       {deleting && (

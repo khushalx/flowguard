@@ -1,6 +1,16 @@
 import { z } from "zod";
+import { journeyDefinitionSchema } from "../../packages/runner/src/schema";
 
-export const statusSchema = z.enum(["passed", "failed", "running", "unknown"]);
+export const statusSchema = z.enum([
+  "passed",
+  "failed",
+  "running",
+  "unknown",
+  "queued",
+  "error",
+  "timed_out",
+  "cancelled",
+]);
 export type RunStatus = z.infer<typeof statusSchema>;
 
 export const projectSchema = z.object({
@@ -24,6 +34,8 @@ export const journeySchema = z.object({
     .max(500)
     .refine(validPath, "Use a start path or HTTP(S) URL."),
   condition: z.string().min(1).max(500),
+  definition: journeyDefinitionSchema.optional(),
+  enabled: z.boolean().optional(),
   createdAt: z.string().datetime({ offset: true }),
 });
 export type Journey = z.infer<typeof journeySchema>;
@@ -61,6 +73,10 @@ export const runSchema = z.object({
     })
     .optional(),
   screenshot: z.string().optional(),
+  batchId: z.string().uuid().optional(),
+  failureCategory: z.string().nullable().optional(),
+  error: z.string().nullable().optional(),
+  githubUrl: z.string().url().optional(),
 });
 export type Run = z.infer<typeof runSchema>;
 

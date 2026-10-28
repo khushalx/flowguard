@@ -21,6 +21,7 @@ export function Investigation({
   run: Run;
   compact?: boolean;
 }) {
+  const demo = !run.batchId;
   const failureIndex = run.steps.findIndex((s) => s.status === "failed");
   const [selected, setSelected] = useState(
     failureIndex >= 0 ? failureIndex : 0,
@@ -113,7 +114,9 @@ export function Investigation({
             <h2>{step?.name ?? "No result was recorded"}</h2>
             <p>
               {step?.detail ??
-                "This sample run does not include browser step evidence."}
+                (demo
+                  ? "This sample run does not include browser step evidence."
+                  : "No browser step evidence was returned for this execution.")}
             </p>
           </div>
           {showingFailure && run.assertion ? (
@@ -141,8 +144,7 @@ export function Investigation({
                       <code>{run.assertion.locator}</code>
                     </pre>
                     <p className="mono small-text muted">
-                      Timeout: {run.assertion.timeout.toLocaleString()}ms ·
-                      Expected state: visible
+                      Timeout: {run.assertion.timeout.toLocaleString()}ms
                     </p>
                   </div>
                 </details>
@@ -170,7 +172,11 @@ export function Investigation({
                 <button
                   className="icon-button"
                   onClick={() => setExpanded(true)}
-                  aria-label="Expand screenshot fixture"
+                  aria-label={
+                    demo
+                      ? "Expand screenshot fixture"
+                      : "Expand failure screenshot"
+                  }
                   title="Expand screenshot"
                 >
                   <Expand size={16} />
@@ -179,19 +185,29 @@ export function Investigation({
               <button
                 className="screenshot-button"
                 onClick={() => setExpanded(true)}
-                aria-label="View illustrative screenshot fixture"
+                aria-label={
+                  demo
+                    ? "View illustrative screenshot fixture"
+                    : "View failure screenshot"
+                }
               >
                 <Image
                   src={run.screenshot}
                   width={960}
                   height={540}
-                  alt={`Illustrative demo screenshot for ${run.journeyName}. Observed: ${run.assertion?.received ?? "Sample page"}.`}
+                  alt={
+                    demo
+                      ? `Illustrative demo screenshot for ${run.journeyName}. Observed: ${run.assertion?.received ?? "Sample page"}.`
+                      : `Captured failure screenshot for ${run.journeyName}.`
+                  }
                   loading="eager"
                   unoptimized
                 />
               </button>
               <figcaption>
-                Illustrative demo fixture · not captured from a live website.
+                {demo
+                  ? "Illustrative demo fixture · not captured from a live website."
+                  : "Captured by the verified runner. Private evidence expires after seven days."}
               </figcaption>
             </figure>
           ) : (
@@ -202,7 +218,9 @@ export function Investigation({
                 <p>
                   {run.status === "passed"
                     ? "Review the recorded steps and logs for this result."
-                    : "This sample record does not include a screenshot."}
+                    : demo
+                      ? "This sample record does not include a screenshot."
+                      : "Capture was disabled, unavailable, or the evidence retention period expired."}
                 </p>
               </div>
             </div>
@@ -219,7 +237,9 @@ export function Investigation({
         </summary>
         <div className="log-content">
           <div className="log-toolbar">
-            <span className="mono">Sample log output</span>
+            <span className="mono">
+              {demo ? "Sample log output" : "Sanitized runner diagnostics"}
+            </span>
             <button className="text-link" onClick={copyLogs}>
               <Copy size={14} />
               Copy logs
@@ -232,8 +252,12 @@ export function Investigation({
       </details>
       {expanded && run.screenshot && (
         <Dialog
-          title="Screenshot fixture"
-          description="Illustrative demo evidence. This is not a screenshot from a real test execution."
+          title={demo ? "Screenshot fixture" : "Failure screenshot"}
+          description={
+            demo
+              ? "Illustrative demo evidence. This is not a screenshot from a real test execution."
+              : "Private screenshot captured during this execution."
+          }
           onClose={() => setExpanded(false)}
           wide
         >
@@ -242,17 +266,19 @@ export function Investigation({
               src={run.screenshot}
               width={960}
               height={540}
-              alt={`Expanded demo screenshot for ${run.journeyName}.`}
+              alt={`Expanded ${demo ? "demo" : "failure"} screenshot for ${run.journeyName}.`}
               unoptimized
             />
           </div>
           <div className="dialog-actions">
             <a
               className="button secondary"
-              download="flowguard-demo-evidence.svg"
+              download={
+                demo ? "flowguard-demo-evidence.svg" : "flowguard-failure.png"
+              }
               href={run.screenshot}
             >
-              Download fixture
+              {demo ? "Download fixture" : "Download screenshot"}
             </a>
             <button
               className="button primary"

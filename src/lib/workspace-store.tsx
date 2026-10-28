@@ -1,7 +1,7 @@
 "use client";
 import { useState, useCallback, useRef, type ReactNode } from "react";
 import { Context, apiRequest, type State } from "./workspace-context";
-import { projectSchema, journeySchema, runSchema } from "./model";
+import { projectSchema, journeySchema, runSchema, type Run } from "./model";
 import type { LiveSnapshot } from "./server/workspace";
 export {
   apiRequest,
@@ -24,6 +24,8 @@ export function LiveWorkspaceProvider({
     const pending = apiRequest(`/api/runs/${encodeURIComponent(id)}`)
       .then((result) => {
         const run = runSchema.parse(result);
+        if (["queued", "running"].includes(run.status))
+          runDetails.current.delete(id);
         setState((s) => ({
           ...s,
           workspace: {
@@ -40,6 +42,21 @@ export function LiveWorkspaceProvider({
     return pending;
   }, []);
   const runOffset = useRef(initial.runOffset);
+  const updateRunViews = useCallback((runs: Run[]) => {
+    setState((s) => ({
+      ...s,
+      workspace: {
+        ...s.workspace,
+        runs: [
+          ...s.workspace.runs.filter(
+            (old) => !runs.some((run) => run.id === old.id),
+          ),
+          ...runs,
+        ],
+      },
+    }));
+    for (const run of runs) runDetails.current.delete(run.id);
+  }, []);
   async function loadMoreRuns() {
     const result = await apiRequest(`/api/runs?offset=${runOffset.current}`);
     const runs = runSchema.array().parse(result.runs);
@@ -220,6 +237,7 @@ export function LiveWorkspaceProvider({
         loadMoreRuns,
         runsHasMore: state.runsHasMore,
         refresh,
+        updateRunViews,
       }}
     >
       {children}

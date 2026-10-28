@@ -2919,3 +2919,42 @@ pre {
     flex-wrap: wrap;
   }
 }
+.journey-step-editor {
+  border: 0;
+  background: #151515;
+  padding: 18px;
+  margin: 18px 0;
+  min-width: 0;
+}
+.journey-step-editor legend {
+  padding: 0 6px;
+  font-weight: 500;
+}
+.journey-step-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.journey-step-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 16px;
+}
+.engine-check {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+  font-size: 14px;
+}
+.engine-check input {
+  width: 16px;
+  min-height: 16px;
+  accent-color: #eee;
+}
+@media (max-width: 600px) {
+  .journey-step-fields {
+    grid-template-columns: 1fr;
+  }
+}

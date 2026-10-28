@@ -29,6 +29,10 @@ const statusInfo: Record<
   running: { icon: LoaderCircle, label: "Running" },
   unknown: { icon: CircleHelp, label: "No result" },
   skipped: { icon: Circle, label: "Skipped" },
+  queued: { icon: Circle, label: "Queued" },
+  error: { icon: CircleX, label: "Execution error" },
+  timed_out: { icon: CircleX, label: "Timed out" },
+  cancelled: { icon: Circle, label: "Cancelled" },
 };
 export function StatusIndicator({
   status = "unknown",

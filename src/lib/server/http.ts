@@ -26,9 +26,29 @@ export function internalRedirect(path: string) {
 export async function jsonBody(request: Request) {
   if (!request.headers.get("content-type")?.startsWith("application/json"))
     throw new AppError("Send JSON data.", 415);
-  const text = await request.text();
-  if (text.length > 200_000)
+  if (Number(request.headers.get("content-length")) > 200_000)
     throw new AppError("This request is too large.", 413);
+  const reader = request.body?.getReader();
+  let size = 0;
+  let text = "";
+  const decoder = new TextDecoder();
+  if (reader) {
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > 200_000) {
+          await reader.cancel();
+          throw new AppError("This request is too large.", 413);
+        }
+        text += decoder.decode(value, { stream: true });
+      }
+      text += decoder.decode();
+    } finally {
+      reader.releaseLock();
+    }
+  }
   try {
     return JSON.parse(text) as unknown;
   } catch {

@@ -12,7 +12,12 @@ export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request: { headers } });
   const config = publicConfig();
   let authenticated = false;
-  if (config && request.nextUrl.pathname !== "/api/github/webhook") {
+  if (
+    config &&
+    request.nextUrl.pathname !== "/api/github/webhook" &&
+    !request.nextUrl.pathname.startsWith("/api/runner/") &&
+    request.nextUrl.pathname !== "/api/engine/reconcile"
+  ) {
     const supabase = createServerClient(config.url, config.key, {
       global: { fetch: backendFetch("supabase") },
       cookieOptions: {

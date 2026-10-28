@@ -1,6 +1,6 @@
 "use client";
 import Link from "./workspace-link";
-import { ArrowUpRight, Check, CircleX, Plus, Route } from "lucide-react";
+import { ArrowUpRight, Check, Plus, Route } from "lucide-react";
 import { latestRun, relativeTime } from "@/lib/model";
 import { useWorkspace } from "@/lib/workspace-store";
 import {
@@ -9,6 +9,7 @@ import {
   SectionHeading,
   TextLink,
   WorkspaceLoading,
+  StatusIndicator,
 } from "./ui";
 import { ProjectAvatar, ProjectList, RunList } from "./rows";
 
@@ -17,7 +18,7 @@ export function Overview() {
   if (!w) return <WorkspaceLoading />;
   const failures = w.journeys
     .map((j) => latestRun(w.runs, j.projectId, j.id))
-    .filter((r) => r?.status === "failed");
+    .filter((r) => r && ["failed", "error", "timed_out"].includes(r.status));
   const recent = [...w.runs].sort(
     (a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt),
   );
@@ -58,7 +59,7 @@ export function Overview() {
               <span className="mono">02</span>Define a journey
             </span>
             <span>
-              <span className="mono">03</span>Connect execution later
+              <span className="mono">03</span>Configure execution
             </span>
           </div>
         </div>
@@ -88,16 +89,14 @@ export function Overview() {
                         <span>{project.name}</span>
                         <span className="inline-dot">/</span>
                         <span className="mono">#{run.number}</span>
-                        <span className="attention-status">
-                          <CircleX size={15} />
-                          Failed
-                        </span>
+                        <StatusIndicator status={run.status} />
                       </div>
                       <h3>{run.journeyName}</h3>
                       <p>
-                        {run.assertion
-                          ? `Expected “${run.assertion.expected}”. The confirmation wasn’t visible.`
-                          : "A recorded assertion failed. Inspect the steps and evidence."}
+                        {run.error ||
+                          (run.assertion
+                            ? `Expected “${run.assertion.expected}”. Inspect the observed result.`
+                            : "Inspect the recorded steps and execution evidence.")}
                       </p>
                       <div className="attention-bottom">
                         <span className="mono">
@@ -120,7 +119,7 @@ export function Overview() {
                     <p>
                       {w.runs.length
                         ? "No failures in the latest recorded journey results."
-                        : "No results yet. Test execution is not connected."}
+                        : "No results yet. Configure a journey and GitHub Actions to run tests."}
                     </p>
                   </div>
                 </div>
@@ -171,8 +170,8 @@ export function Overview() {
                 <div className="quiet-state">
                   <Route size={20} />
                   <p>
-                    No recorded runs. Prepare a journey while execution is being
-                    connected.
+                    No recorded runs. Configure a journey and run tests from its
+                    project.
                   </p>
                 </div>
               )}

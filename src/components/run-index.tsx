@@ -39,24 +39,37 @@ export function RunIndex() {
               role="group"
               aria-label="Filter by result"
             >
-              {(["all", "failed", "passed", "running", "unknown"] as const).map(
-                (s) => (
-                  <button
-                    key={s}
-                    aria-pressed={status === s}
-                    onClick={() => setStatus(s)}
-                  >
-                    {s === "all"
-                      ? "All runs"
-                      : s === "unknown"
-                        ? "No result"
-                        : s.charAt(0).toUpperCase() + s.slice(1)}
-                    {s === "all" && (
-                      <span className="count">{w.runs.length}</span>
-                    )}
-                  </button>
-                ),
-              )}
+              {(
+                [
+                  "all",
+                  "failed",
+                  "passed",
+                  "running",
+                  "unknown",
+                  ...(data?.mode === "live"
+                    ? (["queued", "error", "timed_out", "cancelled"] as const)
+                    : []),
+                ] as const
+              ).map((s) => (
+                <button
+                  key={s}
+                  aria-pressed={status === s}
+                  onClick={() => setStatus(s)}
+                >
+                  {s === "all"
+                    ? "All runs"
+                    : s === "unknown"
+                      ? "No result"
+                      : s === "timed_out"
+                        ? "Timed out"
+                        : s === "error"
+                          ? "Execution error"
+                          : s.charAt(0).toUpperCase() + s.slice(1)}
+                  {s === "all" && (
+                    <span className="count">{w.runs.length}</span>
+                  )}
+                </button>
+              ))}
             </div>
             <div className="search-field">
               <Search size={16} aria-hidden="true" />
@@ -105,7 +118,11 @@ export function RunIndex() {
         <EmptyState
           icon={ListChecks}
           title="Your run history will appear here"
-          description="Configure a project and its journeys first. This frontend does not execute tests yet, so no results have been created."
+          description={
+            data?.mode === "live"
+              ? "Configure a structured journey and GitHub Actions, then run tests from a project."
+              : "Configure a project and its journeys first. This demo does not execute tests, so no results have been created."
+          }
         />
       )}
       {runsHasMore && (

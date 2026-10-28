@@ -14,7 +14,6 @@ import {
 import { duration, host, latestRun, relativeTime } from "@/lib/model";
 import { useWorkspace } from "@/lib/workspace-store";
 import {
-  ExecutionDialog,
   MissingRecord,
   PageHeader,
   SectionHeading,
@@ -26,6 +25,7 @@ import { JourneyEditor, JourneysList } from "./journeys";
 import { connectionLabels } from "./repository-picker";
 import { ProjectSettings } from "./project-settings";
 import { ProjectAvatar, RunList } from "./rows";
+import { ExecutionLauncher } from "./execution-dialog";
 export function ProjectDetail({
   id,
   journeysOnly = false,
@@ -174,7 +174,10 @@ export function ProjectDetail({
                       ? "The confirmation assertion failed. Review the recorded evidence."
                       : latest.status === "passed"
                         ? "The success condition matched in this recorded run."
-                        : "This is a sample record; no execution is in progress."}
+                        : isLive
+                          ? latest.error ||
+                            "Review the current execution state and recorded evidence."
+                          : "This is a sample record; no execution is in progress."}
                   </p>
                 </div>
                 <Link
@@ -208,8 +211,8 @@ export function ProjectDetail({
             <div className="quiet-state">
               <ListChecks size={19} />
               <span>
-                No runs yet. Define your journeys while test execution is being
-                connected.
+                No runs yet. Define structured journeys and configure GitHub
+                Actions to execute them.
               </span>
             </div>
           )}
@@ -252,7 +255,10 @@ export function ProjectDetail({
           ) : (
             <div className="quiet-state">
               <ListChecks size={20} />
-              <p>No recorded runs. Test execution is not connected yet.</p>
+              <p>
+                No recorded runs. Configure a journey and run tests to create
+                one.
+              </p>
             </div>
           )}
         </section>
@@ -265,12 +271,19 @@ export function ProjectDetail({
               ? "Journey definitions are saved to your workspace."
               : "Journey definitions are saved locally."}{" "}
             <span>
-              Recording, AI generation, and test execution aren’t available yet.
+              {isLive
+                ? "Execution uses your repository’s GitHub Actions runner."
+                : "Recording, AI generation, and test execution aren’t available yet."}
             </span>
           </p>
         </div>
       )}
-      {execution && <ExecutionDialog onClose={() => setExecution(false)} />}
+      {execution && (
+        <ExecutionLauncher
+          project={project}
+          onClose={() => setExecution(false)}
+        />
+      )}
       {editor && (
         <JourneyEditor project={project} onClose={() => setEditor(false)} />
       )}

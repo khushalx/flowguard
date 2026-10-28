@@ -1,4 +1,6 @@
-# FlowGuard Phase 2 setup
+# FlowGuard setup
+
+For the new real browser execution engine, continue with [ENGINE_SETUP.md](ENGINE_SETUP.md) after the authentication/repository setup below. Phase 3 needs its additive migration before deploying the updated source.
 
 No external resources or credentials were created. Without configuration, `/` and `/demo` work, `/app` redirects to `/login`, and login explains the missing setup. Complete the following steps to enable real workspaces.
 
@@ -13,9 +15,9 @@ Set `NEXT_PUBLIC_APP_URL=http://127.0.0.1:3000` locally. Use that exact hostname
 
 Create or choose your Supabase project. Copy its URL and **publishable** key from Connect / API keys into `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Put its server **secret** key (`sb_secret_...`) in `SUPABASE_SECRET_KEY`. Never prefix a secret key with `NEXT_PUBLIC_`.
 
-Apply the migrations in `supabase/migrations/` in timestamp order. Existing Phase 2 databases need only `20261028034001_stabilize_connections.sql`; do not rerun the foundation SQL. Alternatively, use the pinned CLI:
+Apply the migrations in `supabase/migrations/` in timestamp order. Existing Phase 2 databases need the stabilization migration if absent and `20261028040141_execution_engine.sql`; do not rerun the foundation SQL. Alternatively, use the pinned CLI:
 
-The current hosted FlowGuard project already received the stabilization migration during the sign-in repair. Do not apply it again. Its foundation schema was set up without a migration-history entry; before a future CLI push, verify that schema and record the existing foundation with `npx supabase migration repair 20261027215703 --status applied --linked`. Check migration history before executing any pending SQL. Fresh projects need both migration files.
+The current hosted FlowGuard project already received the stabilization migration during the sign-in repair. Do not apply it again. Its foundation schema was set up without a migration-history entry; before a future CLI push, verify that schema and record the existing foundation with `npx supabase migration repair 20261027215703 --status applied --linked`. Check migration history before executing any pending SQL. Fresh projects need all migration files in timestamp order.
 
 ```sh
 npx supabase login
@@ -104,7 +106,7 @@ The UI uses the user's personal workspace. Owners/admins can edit projects and j
 
 Account menu → **Connections & import** → **Import local projects** explicitly previews and imports only the old browser workspace's `local` projects/journeys. Import is validated, transactional and deduplicated using workspace-scoped deterministic IDs and natural keys. Demo projects, sample runs and repository text claims are excluded; local data is kept. Nothing is silently imported.
 
-Targets accept HTTP(S), valid hostnames, and no embedded credentials. The server makes no requests to target URLs. Journeys are definitions only; run tables prepare for Phase 3 and authenticated users cannot fabricate runs.
+Targets accept HTTP(S), valid hostnames, and no embedded credentials. Project setup does not fetch target pages. Dispatch additionally validates public DNS and approved-origin navigation; only the standalone GitHub Actions runner opens the target. Structured journeys and authentic callback results are described in ENGINE_SETUP.md; browser sessions cannot fabricate runs.
 
 ## 6. Verification
 
@@ -129,7 +131,7 @@ After setup, verify with two GitHub accounts in separate browser profiles:
 
 1. Sign in, reload a deep `/app` URL, sign out, and try expired/cancelled callbacks. Confirm no private data after sign out.
 2. Log in again/retry callback: exactly one personal workspace/membership. New accounts must have no demo records.
-3. Create/edit/delete projects/journeys, refresh and sign in again to confirm persistence. Run tests must still explain Phase 3 availability.
+3. Create/edit/delete projects/journeys, refresh and sign in again to confirm persistence. Run tests must explain missing setup or dispatch a configured journey through GitHub Actions as described in ENGINE_SETUP.md.
 4. Connect selected personal repositories. Attempt another user's installation ID and an organization installation: both must fail.
 5. Add/remove repository access, refresh, uninstall, redeliver webhook, and reconnect. Confirm access-required/removed labels.
 6. Redeliver the same webhook: `duplicate: true`; invalid signatures: 401.
@@ -137,10 +139,9 @@ After setup, verify with two GitHub accounts in separate browser profiles:
 
 ## Unverified external setup
 
-Automated tests use local fixtures. Validate hosted Supabase migrations, real OAuth/session refresh, repository access and webhook delivery separately after deployment. See [STABILIZATION.md](STABILIZATION.md) for the audit, measured limits and rollout steps. Test execution, recording, AI diagnostics, payments and billing remain outside Phase 2.
+Automated tests use local fixtures. Validate hosted Supabase migrations, real OAuth/session refresh, repository access and webhook delivery separately after deployment. See [STABILIZATION.md](STABILIZATION.md) for the audit, measured limits and rollout steps. Phase 3 adds the execution engine described in ENGINE_SETUP.md. Recording, AI diagnostics, payments and billing remain deferred.
 
 References: [Supabase SSR](https://supabase.com/docs/guides/auth/server-side/creating-a-client), [GitHub OAuth](https://supabase.com/docs/guides/auth/social-sign-in/auth-github), [installation authentication](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/authenticating-as-a-github-app-installation), [webhook signatures](https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries).
-
 
 ## Stabilization rollout
 
