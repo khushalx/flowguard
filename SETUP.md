@@ -15,9 +15,9 @@ Set `NEXT_PUBLIC_APP_URL=http://127.0.0.1:3000` locally. Use that exact hostname
 
 Create or choose your Supabase project. Copy its URL and **publishable** key from Connect / API keys into `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Put its server **secret** key (`sb_secret_...`) in `SUPABASE_SECRET_KEY`. Never prefix a secret key with `NEXT_PUBLIC_`.
 
-Apply the migrations in `supabase/migrations/` in timestamp order. Existing Phase 2 databases need the stabilization migration if absent and `20261028040141_execution_engine.sql`; do not rerun the foundation SQL. Alternatively, use the pinned CLI:
+Apply the migrations in `supabase/migrations/` in timestamp order. Existing Phase 2 databases need the stabilization migration if absent and `20261028084831_execution_engine.sql`; do not rerun the foundation SQL. Alternatively, use the pinned CLI:
 
-The current hosted FlowGuard project already received the stabilization migration during the sign-in repair. Do not apply it again. Its foundation schema was set up without a migration-history entry; before a future CLI push, verify that schema and record the existing foundation with `npx supabase migration repair 20261027215703 --status applied --linked`. Check migration history before executing any pending SQL. Fresh projects need all migration files in timestamp order.
+The current hosted FlowGuard project already received the stabilization migration during the sign-in repair and the execution-engine migration (`20261028084831`) during the 28 October workspace repair. Do not apply either again. Its foundation schema was set up without a migration-history entry; before a future CLI push, verify that schema and record the existing foundation with `npx supabase migration repair 20261027215703 --status applied --linked`. Check migration history before executing any pending SQL. Fresh projects need all migration files in timestamp order.
 
 ```sh
 npx supabase login
@@ -139,7 +139,7 @@ After setup, verify with two GitHub accounts in separate browser profiles:
 
 ## Unverified external setup
 
-Automated tests use local fixtures. Validate hosted Supabase migrations, real OAuth/session refresh, repository access and webhook delivery separately after deployment. See [STABILIZATION.md](STABILIZATION.md) for the audit, measured limits and rollout steps. Phase 3 adds the execution engine described in ENGINE_SETUP.md. Recording, AI diagnostics, payments and billing remain deferred.
+Automated tests use local fixtures. Validate hosted Supabase migrations, real OAuth/session refresh, repository access and webhook delivery separately after deployment. See [STABILIZATION.md](STABILIZATION.md) for the audit, measured limits and rollout steps. Phase 3 adds the execution engine described in ENGINE_SETUP.md. Recording, payments and billing remain deferred. Optional evidence-based AI diagnostics and investigation tools are described in [INVESTIGATION_SETUP.md](INVESTIGATION_SETUP.md).
 
 References: [Supabase SSR](https://supabase.com/docs/guides/auth/server-side/creating-a-client), [GitHub OAuth](https://supabase.com/docs/guides/auth/social-sign-in/auth-github), [installation authentication](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/authenticating-as-a-github-app-installation), [webhook signatures](https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries).
 

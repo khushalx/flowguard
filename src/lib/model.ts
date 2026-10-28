@@ -77,6 +77,19 @@ export const runSchema = z.object({
   failureCategory: z.string().nullable().optional(),
   error: z.string().nullable().optional(),
   githubUrl: z.string().url().optional(),
+  analysisAvailable: z.boolean().optional(),
+  verificationOf: z.string().uuid().optional(),
+  snapshot: z
+    .object({
+      fingerprint: z.string(),
+      environmentKey: z.string(),
+      target: z.string(),
+      protectedInputs: z.boolean().optional(),
+      repository: z.string(),
+      stepCount: z.number(),
+      version: z.number(),
+    })
+    .optional(),
 });
 export type Run = z.infer<typeof runSchema>;
 

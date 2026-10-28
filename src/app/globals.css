@@ -2958,3 +2958,111 @@ pre {
     grid-template-columns: 1fr;
   }
 }
+
+/* Evidence-led investigation, matching the existing monochrome workspace. */
+.failure-report {
+  margin: 28px 0 36px;
+  min-width: 0;
+}
+.failure-heading h2 {
+  font-size: 22px;
+  line-height: 1.4;
+  margin: 8px 0 12px;
+}
+.failure-heading p {
+  color: var(--text-secondary, #999);
+  max-width: 78ch;
+}
+.failure-plain {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+  margin: 24px 0;
+}
+.failure-plain dt,
+.analysis-evidence dt {
+  color: #999;
+  margin-bottom: 8px;
+}
+.failure-plain dd,
+.analysis-evidence dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.failure-plain dd {
+  max-height: 220px;
+  overflow: auto;
+}
+.prompt-preview {
+  background: #121212;
+  color: #d6d6d6;
+  padding: 20px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  line-height: 1.7;
+  max-height: 55vh;
+  overflow: auto;
+}
+.comparison-body,
+.analysis-evidence {
+  min-width: 0;
+}
+.analysis-evidence > div {
+  margin: 16px 0;
+}
+.verification-result {
+  padding: 16px 0;
+}
+.verification-result p {
+  margin-top: 8px;
+}
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0;
+}
+.checkbox-label input {
+  width: 18px;
+  height: 18px;
+  accent-color: #ddd;
+}
+.problem-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 20px 0;
+}
+.problem-row > div {
+  flex: 1;
+  min-width: 0;
+}
+.problem-row p {
+  margin: 6px 0 0;
+}
+.notification-events {
+  margin: 16px 0;
+  padding-left: 0;
+  list-style: none;
+}
+.notification-events li {
+  padding: 10px 0;
+}
+@media (max-width: 640px) {
+  .failure-plain {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  .problem-row {
+    flex-wrap: wrap;
+  }
+  .prompt-preview {
+    padding: 14px;
+  }
+}
+
+.failure-report > p {
+  margin-top: 14px;
+}

@@ -327,3 +327,34 @@ test("hosted network policy rejects private IPs, metadata, unsafe URLs and origi
     false,
   );
 });
+
+test("literal test input is removed from assertion evidence and suppresses artifacts", async () => {
+  const input = "confidential-customer-input";
+  const out = await executeJourney(
+    config(
+      [
+        {
+          action: "fill",
+          locator: { type: "label", value: "Email" },
+          value: { text: input },
+          timeoutMs: 500,
+        },
+        { action: "click", locator: role("button", "Sign in"), timeoutMs: 500 },
+        {
+          action: "assertText",
+          locator: role("status"),
+          expected: "Other customer",
+          exact: true,
+          timeoutMs: 500,
+        },
+      ],
+      true,
+    ),
+    fixtureOptions(),
+  );
+  assert.equal(out.result.status, "failed");
+  assert.ok(!JSON.stringify(out).includes(input));
+  assert.match(out.result.assertion!.received, /REDACTED/);
+  assert.equal(out.screenshotPath, undefined);
+  assert.equal(out.tracePath, undefined);
+});

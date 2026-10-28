@@ -51,6 +51,7 @@ async function main() {
     retry = false,
   ) {
     for (let attempt = 0; attempt < (retry ? 3 : 1); attempt++) {
+      const started = performance.now();
       try {
         const response = await fetch(new URL(path, base), {
           method: "POST",
@@ -62,6 +63,9 @@ async function main() {
           signal: AbortSignal.timeout(15_000),
           redirect: "error",
         });
+        console.log(
+          `FlowGuard delivery ${path.split("/").at(-1)}: HTTP ${response.status}, ${Math.round(performance.now() - started)}ms, attempt ${attempt + 1}`,
+        );
         if (response.ok) return await response.json();
         if (response.status < 500 || attempt === (retry ? 2 : 0))
           throw new DeliveryError(response.status);
@@ -106,11 +110,15 @@ async function main() {
         token,
         true,
       );
+      const browserStarted = performance.now();
       const output = await executeJourney(run, {
         secrets,
         artifactDirectory: resolve("artifacts"),
         signal: controller.signal,
       });
+      console.log(
+        `FlowGuard browser execution: ${Math.round(performance.now() - browserStarted)}ms (includes browser startup)`,
+      );
       if (output.screenshotPath)
         try {
           const size = (await stat(output.screenshotPath)).size;

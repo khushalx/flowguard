@@ -1,8 +1,9 @@
+import { monitored } from "@/lib/server/monitoring";
 import { apiError, jsonBody, sameOrigin } from "@/lib/server/http";
 import { requireWorkspace } from "@/lib/server/auth";
 import { mutateWorkspace, readWorkspace } from "@/lib/server/workspace";
 import { operationHeaders } from "@/lib/server/transport";
-export async function GET() {
+async function GETHandler() {
   const started = performance.now();
   try {
     return Response.json(await readWorkspace(await requireWorkspace()), {
@@ -12,7 +13,7 @@ export async function GET() {
     return apiError(error);
   }
 }
-export async function POST(request: Request) {
+async function POSTHandler(request: Request) {
   const started = performance.now();
   try {
     sameOrigin(request);
@@ -25,3 +26,6 @@ export async function POST(request: Request) {
     return apiError(error);
   }
 }
+
+export const GET = monitored(GETHandler);
+export const POST = monitored(POSTHandler);

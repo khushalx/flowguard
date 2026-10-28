@@ -1,7 +1,8 @@
+import { monitored } from "@/lib/server/monitoring";
 import { timingSafeEqual } from "node:crypto";
 import { apiError, AppError } from "@/lib/server/http";
 import { reconcileAndRetain } from "@/lib/server/execution-read";
-export async function GET(request: Request) {
+async function GETHandler(request: Request) {
   try {
     const expected = process.env.CRON_SECRET;
     const actual = request.headers.get("authorization");
@@ -19,3 +20,5 @@ export async function GET(request: Request) {
     return apiError(error);
   }
 }
+
+export const GET = monitored(GETHandler);

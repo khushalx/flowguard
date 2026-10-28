@@ -1,8 +1,9 @@
+import { monitored } from "@/lib/server/monitoring";
 import { z } from "zod";
 import { apiError, jsonBody, dbCheck, AppError } from "@/lib/server/http";
 import { engineOperation, runnerAuthorization } from "@/lib/server/execution";
 import { adminClient } from "@/lib/supabase/admin";
-export async function POST(request: Request) {
+async function POSTHandler(request: Request) {
   try {
     const hash = await runnerAuthorization(request, "exec");
     const input = z
@@ -54,3 +55,5 @@ export async function POST(request: Request) {
     return apiError(error);
   }
 }
+
+export const POST = monitored(POSTHandler);

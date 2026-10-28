@@ -1,3 +1,4 @@
+import { monitored } from "@/lib/server/monitoring";
 import { z } from "zod";
 import { adminClient } from "@/lib/supabase/admin";
 import {
@@ -9,7 +10,7 @@ import {
 import { apiError, AppError, dbCheck } from "@/lib/server/http";
 
 export const runtime = "nodejs";
-export async function POST(request: Request) {
+async function POSTHandler(request: Request) {
   try {
     const secret = process.env.GITHUB_WEBHOOK_SECRET;
     if (!secret) throw new AppError("Webhook is not configured.", 503);
@@ -61,3 +62,5 @@ export async function POST(request: Request) {
     return apiError(error);
   }
 }
+
+export const POST = monitored(POSTHandler);

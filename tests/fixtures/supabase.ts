@@ -76,12 +76,17 @@ async function main() {
       "workspace_members",
       "execution_batches",
       "run_artifacts",
+      "failure_analyses",
+      "run_issue_links",
+      "notification_preferences",
+      "workspace_events",
     ];
     if (!allowed.includes(table)) throw new Error("Unsupported fixture table");
     const values: unknown[] = [];
     const filters: string[] = [];
     for (const [key, value] of url.searchParams) {
-      if (["select", "order", "limit", "offset"].includes(key)) continue;
+      if (["select", "order", "limit", "offset", "on_conflict"].includes(key))
+        continue;
       if (key === "projects.workspace_id") {
         values.push(value.replace(/^eq\./, ""));
         filters.push(
@@ -141,7 +146,14 @@ async function main() {
       const keys = Object.keys(body);
       if (!keys.every((k) => /^[a-z_]+$/.test(k)))
         throw new Error("Invalid fixture fields");
-      if (method === "POST")
+      if (method === "POST" && table === "notification_preferences")
+        rows = (
+          await tx.query(
+            `insert into public.notification_preferences(workspace_id,user_id,in_app) values($1,$2,$3) on conflict(workspace_id,user_id) do update set in_app=excluded.in_app returning *`,
+            [body.workspace_id, body.user_id, body.in_app],
+          )
+        ).rows;
+      else if (method === "POST")
         rows = (
           await tx.query(
             `insert into public.${table}(${keys.map((k) => `"${k}"`).join(",")}) values(${keys.map((_, i) => "$" + (i + 1)).join(",")}) returning *`,
@@ -185,6 +197,17 @@ async function main() {
             )
           ).rows;
         }
+        if (
+          table === "runs" &&
+          url.searchParams.get("select")?.includes("execution_batches(")
+        )
+          r.execution_batches =
+            (
+              await tx.query(
+                "select repository_name from public.execution_batches where id=$1",
+                [r.batch_id],
+              )
+            ).rows[0] || null;
         return r;
       }),
     );
@@ -366,6 +389,13 @@ async function main() {
         await tx.query("select set_config('request.jwt.claim.sub',$1,true)", [
           uid,
         ]);
+        if (url.pathname === "/rest/v1/rpc/investigation_operation")
+          return (
+            await tx.query<{ result: unknown }>(
+              "select public.investigation_operation($1,$2) as result",
+              [body.op, JSON.stringify(body.args)],
+            )
+          ).rows[0].result;
         if (url.pathname === "/rest/v1/rpc/engine_operation")
           return (
             await tx.query<{ result: unknown }>(

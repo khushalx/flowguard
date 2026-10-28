@@ -37,12 +37,15 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: "22"
-      - name: Install runner and Chromium
+      - name: Install pinned runner dependencies
         working-directory: flowguard-source/packages/runner
-        run: |
-          npm ci --ignore-scripts
-          npm run build
-          npx playwright install --with-deps chromium
+        run: npm ci --ignore-scripts
+      - name: Build runner
+        working-directory: flowguard-source/packages/runner
+        run: npm run build
+      - name: Install Chromium and system dependencies
+        working-directory: flowguard-source/packages/runner
+        run: npx playwright install --with-deps chromium
       - name: Execute and report real results
         working-directory: flowguard-source/packages/runner
         env:

@@ -1,9 +1,10 @@
+import { monitored } from "@/lib/server/monitoring";
 import { z } from "zod";
 import { requireWorkspace } from "@/lib/server/auth";
 import { apiError, sameOrigin } from "@/lib/server/http";
 import { readExecution, cancelExecution } from "@/lib/server/execution-read";
 type Params = { params: Promise<{ id: string }> };
-export async function GET(_request: Request, { params }: Params) {
+async function GETHandler(_request: Request, { params }: Params) {
   try {
     return Response.json(
       await readExecution(
@@ -19,7 +20,7 @@ export async function GET(_request: Request, { params }: Params) {
     return apiError(error);
   }
 }
-export async function POST(request: Request, { params }: Params) {
+async function POSTHandler(request: Request, { params }: Params) {
   try {
     sameOrigin(request);
     return Response.json(
@@ -36,3 +37,6 @@ export async function POST(request: Request, { params }: Params) {
     return apiError(error);
   }
 }
+
+export const GET = monitored(GETHandler);
+export const POST = monitored(POSTHandler);

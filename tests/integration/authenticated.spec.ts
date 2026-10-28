@@ -112,7 +112,7 @@ test("mocked GitHub PKCE sign-in creates a real SQL workspace; CRUD persists, im
     path: `/tmp/flowguard-phase2-${testInfo.project.name}-project.png`,
     fullPage: true,
   });
-  await page.getByRole("button", { name: "Run tests", exact: true }).click();
+  await page.getByRole("button", { name: "Run a check", exact: true }).click();
   await expect(page.getByRole("dialog")).toContainText(
     "Connect a repository in project settings before running tests.",
   );

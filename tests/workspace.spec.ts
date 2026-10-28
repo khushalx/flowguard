@@ -22,10 +22,14 @@ test("failure evidence is inspectable and run actions never fabricate results", 
   await expect(page).toHaveURL(/\/demo\/runs\/run-1038$/);
   await expect(page.getByText("Run failed", { exact: true })).toBeVisible();
   await expect(
-    page.getByText("Thank you for your purchase", { exact: true }),
+    page
+      .getByRole("region", { name: "Failure investigation" })
+      .getByText("Thank you for your purchase", { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByText("Payment could not be processed", { exact: true }),
+    page
+      .getByRole("region", { name: "Failure investigation" })
+      .getByText("Payment could not be processed", { exact: true }),
   ).toBeVisible();
   await expect(page.locator(".timeline-step")).toHaveCount(5);
   await page.getByText("Assertion details", { exact: true }).click();
@@ -124,7 +128,7 @@ test("local project and journey lifecycle persists and stays separate from demo"
   await expect(
     page.getByRole("heading", { name: "My storefront", exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Run tests", exact: true }).click();
+  await page.getByRole("button", { name: "Run a check", exact: true }).click();
   await expect(page.getByRole("dialog")).toContainText(
     "Test execution isn’t connected yet",
   );
@@ -270,7 +274,10 @@ test("storage write failures do not report successful mutations", async ({
 
 test("dialog supports Escape and restores keyboard focus", async ({ page }) => {
   await page.goto("/demo/projects/ledger");
-  const trigger = page.getByRole("button", { name: "Run tests", exact: true });
+  const trigger = page.getByRole("button", {
+    name: "Run a check",
+    exact: true,
+  });
   await trigger.click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.keyboard.press("Escape");

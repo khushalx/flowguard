@@ -1,3 +1,4 @@
+import { monitored } from "@/lib/server/monitoring";
 import { randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { z } from "zod";
@@ -22,7 +23,7 @@ const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("refresh"), id: z.string().uuid() }),
   z.object({ action: z.literal("disconnect"), id: z.string().uuid() }),
 ]);
-export async function GET() {
+async function GETHandler() {
   try {
     return Response.json(await readConnections(await requireWorkspace()), {
       headers: { "Cache-Control": "private, no-store" },
@@ -31,7 +32,7 @@ export async function GET() {
     return apiError(error);
   }
 }
-export async function POST(request: Request) {
+async function POSTHandler(request: Request) {
   try {
     sameOrigin(request);
     const body = schema.parse(await jsonBody(request));
@@ -99,3 +100,6 @@ export async function POST(request: Request) {
     return apiError(error);
   }
 }
+
+export const GET = monitored(GETHandler);
+export const POST = monitored(POSTHandler);

@@ -14,6 +14,8 @@ import {
 } from "./ui";
 import { Investigation } from "./investigation";
 import { ExecutionLauncher } from "./execution-dialog";
+import { unsuccessful } from "@/lib/investigation/evidence";
+import { FailureTools } from "./failure-tools";
 
 export function RunDetail({ id }: { id: string }) {
   const { workspace: w, data, isLive, loadRun } = useWorkspace();
@@ -130,7 +132,7 @@ export function RunDetail({ id }: { id: string }) {
               Copy summary
             </button>
             <button
-              className="button primary"
+              className={`button ${unsuccessful(run) ? "secondary" : "primary"}`}
               onClick={() => setExecution(true)}
             >
               <Play size={15} />
@@ -157,7 +159,9 @@ export function RunDetail({ id }: { id: string }) {
         />
         <p>
           {isLive
-            ? run.error ||
+            ? (unsuccessful(run)
+                ? "This execution did not complete successfully. Review the investigation below."
+                : null) ||
               (run.status === "passed"
                 ? `All ${run.steps.length} recorded steps passed.`
                 : run.status === "queued"
@@ -178,6 +182,7 @@ export function RunDetail({ id }: { id: string }) {
           {data?.mode === "demo" ? "Demo result" : "Recorded result"}
         </span>
       </div>
+      <FailureTools key={`tools-${run.id}`} run={run} project={project} />
       {run.failureCategory && (
         <p className="info-panel">
           Failure category: {run.failureCategory.replaceAll("_", " ")}
@@ -200,7 +205,9 @@ export function RunDetail({ id }: { id: string }) {
           )}
         </div>
       )}
-      <Investigation key={run.id} run={run} />
+      <div id="evidence">
+        <Investigation key={run.id} run={run} />
+      </div>
       <details className="run-metadata-disclosure">
         <summary>
           <span>

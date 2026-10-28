@@ -117,14 +117,23 @@ export async function executeJourney(
       "A referenced FG_TEST_ credential is missing from the runner environment.";
     return { result };
   }
-  const secrets = secretRefs.map((ref) => options.secrets![ref]!);
+  const secrets = [
+    ...secretRefs.map((ref) => options.secrets![ref]!),
+    ...config.definition.steps.flatMap((s) =>
+      s.action === "fill" && "text" in s.value
+        ? [s.value.text]
+        : s.action === "selectOption"
+          ? [s.value]
+          : [],
+    ),
+  ];
   const capture =
     config.definition.captureArtifacts &&
     !secrets.length &&
     !!options.artifactDirectory;
   if (config.definition.captureArtifacts && secrets.length)
     result.logs.push(
-      "Artifact capture disabled because this journey uses protected test credentials.",
+      "Artifact capture disabled because this journey uses test input values.",
     );
   let browser: Browser | undefined;
   let proxy: Awaited<ReturnType<typeof safeProxy>> | undefined;
@@ -146,6 +155,7 @@ export async function executeJourney(
     if (options.signal?.aborted) throw new Error("Cancelled");
     result.failureCategory = "INFRASTRUCTURE_ERROR";
     proxy = await safeProxy(config.targetUrl, options.allowPrivateForFixture);
+    const browserStarted = performance.now();
     browser = await chromium.launch({
       headless: true,
       timeout: Math.min(config.definition.timeoutMs, 30_000),
@@ -157,6 +167,9 @@ export async function executeJourney(
         "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
       ],
     });
+    result.logs.push(
+      `Chromium startup: ${Math.round(performance.now() - browserStarted)}ms.`,
+    );
     if (timedOut || options.signal?.aborted) throw new Error("Interrupted");
     const context = await browser.newContext({
       serviceWorkers: "block",

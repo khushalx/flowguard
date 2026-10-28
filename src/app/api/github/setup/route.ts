@@ -1,3 +1,4 @@
+import { monitored } from "@/lib/server/monitoring";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -8,7 +9,7 @@ import { hashState, sameSecret } from "@/lib/server/github-security";
 import { appOrigin, safeReturnTo } from "@/lib/env";
 import { AppError, dbCheck, internalRedirect } from "@/lib/server/http";
 
-export async function GET(request: Request) {
+async function GETHandler(request: Request) {
   const store = await cookies();
   const saved = store.get("fg_install_state")?.value;
   let destination = "/app/connections";
@@ -66,3 +67,5 @@ export async function GET(request: Request) {
     return internalRedirect(target.pathname + target.search);
   }
 }
+
+export const GET = monitored(GETHandler);

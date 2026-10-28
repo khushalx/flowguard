@@ -1,8 +1,9 @@
+import { monitored } from "@/lib/server/monitoring";
 import { z } from "zod";
 import { requireWorkspace } from "@/lib/server/auth";
 import { readRunPage } from "@/lib/server/workspace";
 import { apiError } from "@/lib/server/http";
-export async function GET(request: Request) {
+async function GETHandler(request: Request) {
   try {
     const offset = z.coerce
       .number()
@@ -17,3 +18,5 @@ export async function GET(request: Request) {
     return apiError(error);
   }
 }
+
+export const GET = monitored(GETHandler);

@@ -26,6 +26,9 @@ export default defineConfig({
   webServer: {
     command: "npm run dev -- --hostname 127.0.0.1 --port 3020",
     env: {
+      OPENAI_API_KEY: "",
+      SENTRY_DSN: "",
+      NEXT_PUBLIC_SENTRY_DSN: "",
       FLOWGUARD_TEST_DIST: ".next-e2e-test",
       NEXT_PUBLIC_APP_URL: "http://127.0.0.1:3020",
       NEXT_PUBLIC_SUPABASE_URL: "",

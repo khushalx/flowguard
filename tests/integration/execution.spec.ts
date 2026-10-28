@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import http from "node:http";
+import { writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import type { ExecutionResult } from "../../packages/runner/src/schema";
 function executeFixture(config: unknown): Promise<{ result: ExecutionResult }> {
@@ -118,7 +119,7 @@ test("mock GitHub dispatch and claim persist real local Chromium outcomes and st
     .click();
   await expect(page.locator(".journey-row")).toContainText("Heading works");
   const secret = await credential(page, id);
-  await page.getByRole("button", { name: "Run tests", exact: true }).click();
+  await page.getByRole("button", { name: "Run a check", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Run 1 journey", exact: true }),
   ).toBeEnabled();
@@ -333,4 +334,195 @@ test("editing preserves exact URL assertions and validates reordered steps befor
   await expect(page.getByRole("dialog")).toContainText(
     "Navigation must stay on the approved project origin",
   );
+});
+
+test("real assertion failure can be investigated and verified without changing its immutable result", async ({
+  page,
+}, info) => {
+  const id = await project(page),
+    journeyId = await journey(page, id),
+    secret = await credential(page, id);
+  let heading = "Checkout unavailable";
+  const server = http.createServer((_req, res) => {
+    res.setHeader("Content-Type", "text/html");
+    res.end(`<!doctype html><html><body><h1>${heading}</h1></body></html>`);
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  async function execute(batchId: string) {
+    const response = await page.request.post("/api/runner/claim", {
+      data: { batchId, repositoryId: 456, githubRunId: 555 },
+      headers: { Authorization: `Bearer ${secret}` },
+    });
+    expect(response.status()).toBe(200);
+    const claimed = await response.json(),
+      runId = claimed.runs[0].runId;
+    expect(
+      (
+        await page.request.post("/api/runner/start", {
+          data: { batchId, runId },
+          headers: { Authorization: `Bearer ${claimed.token}` },
+        })
+      ).ok(),
+    ).toBe(true);
+    const out = await executeFixture({
+      ...claimed.runs[0],
+      targetUrl: `http://127.0.0.1:${(server.address() as { port: number }).port}`,
+    });
+    expect(
+      (
+        await page.request.post("/api/runner/results", {
+          data: { batchId, runId, result: out.result },
+          headers: { Authorization: `Bearer ${claimed.token}` },
+        })
+      ).ok(),
+    ).toBe(true);
+    return { id: runId, result: out.result };
+  }
+  try {
+    const queued = await post(page, "/api/executions", {
+      action: "run",
+      projectId: id,
+      requestId: crypto.randomUUID(),
+    });
+    expect(queued.ok()).toBe(true);
+    const failure = await execute((await queued.json()).id);
+    expect(failure.result.status).toBe("failed");
+    expect(failure.result.failureCategory).toBe("APPLICATION_FAILURE");
+    await page.goto(`/app/runs/${failure.id}`);
+    await expect(
+      page.getByRole("button", { name: "Copy fix prompt", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Analyze failure", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("region", { name: "Failure investigation" }),
+    ).toContainText("Checkout unavailable");
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await page.screenshot({
+      path: `/tmp/flowguard-investigation-${info.project.name}.png`,
+      fullPage: true,
+    });
+    await page.getByText("More investigation actions", { exact: true }).click();
+    await page
+      .getByRole("button", { name: "Preview prompt", exact: true })
+      .click();
+    await expect(page.getByRole("dialog")).toContainText("Preserve security");
+    const download = page.waitForEvent("download");
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Download Markdown", exact: true })
+      .click();
+    expect((await download).suggestedFilename()).toMatch(/fix.md$/);
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    await page.keyboard.press("Escape");
+    const reportResponse = await page.request.get(
+      `/api/runs/${failure.id}/report`,
+    );
+    expect(reportResponse.status()).toBe(200);
+    expect(reportResponse.headers()["x-request-id"]).toBeTruthy();
+    const before = await reportResponse.json();
+    expect(before.prompt).toContain("Checkout unavailable");
+    writeFileSync(
+      `/tmp/flowguard-investigation-${info.project.name}-metrics.json`,
+      JSON.stringify({
+        reportTiming: before.timing,
+        reportBytes: Buffer.byteLength(JSON.stringify(before)),
+        browserLogs: failure.result.logs,
+      }),
+    );
+    await info.attach("investigation-metrics", {
+      body: JSON.stringify({
+        viewport: info.project.name,
+        reportTiming: before.timing,
+        reportBytes: Buffer.byteLength(JSON.stringify(before)),
+        browserLogs: failure.result.logs,
+      }),
+      contentType: "application/json",
+    });
+    const unknown = "99999999-9999-4999-8999-999999999999";
+    expect(
+      (await page.request.get(`/api/runs/${unknown}/report`)).status(),
+    ).toBe(404);
+    expect(
+      (
+        await post(page, `/api/runs/${failure.id}/analysis`, {
+          reviewedHash: before.ai.evidenceHash,
+        })
+      ).status(),
+    ).toBe(503);
+    const issue = await post(page, `/api/runs/${failure.id}/issue`, {
+      action: "check",
+    });
+    expect(issue.status()).toBe(200);
+    expect((await issue.json()).available).toBe(false);
+    // Change current editor state. Verification must still execute the saved snapshot.
+    const edit = await post(page, "/api/workspace", {
+      action: "saveJourney",
+      id: journeyId,
+      input: {
+        projectId: id,
+        name: "Edited heading",
+        path: "/",
+        condition: "Changed test",
+        enabled: true,
+        definition: {
+          version: 1,
+          steps: [
+            {
+              action: "assertText",
+              locator: { type: "role", value: "heading" },
+              expected: "Different expectation",
+              exact: false,
+              timeoutMs: 500,
+            },
+          ],
+          timeoutMs: 10000,
+          captureArtifacts: false,
+        },
+      },
+    });
+    expect(edit.ok()).toBe(true);
+    heading = "Fixture dashboard";
+    await page.getByRole("button", { name: "Verify fix", exact: true }).click();
+    await expect(page.getByRole("dialog")).toContainText("Heading works");
+    await page
+      .getByRole("button", { name: "Run saved check", exact: true })
+      .click();
+    await expect(page).toHaveURL(/app\/executions\/[a-f0-9-]+$/);
+    const fixed = await execute(
+      new URL(page.url()).pathname.split("/").at(-1)!,
+    );
+    expect(fixed.result.status).toBe("passed");
+    const after = await (
+      await page.request.get(`/api/runs/${failure.id}/report`)
+    ).json();
+    expect(after.run.status).toBe("failed");
+    expect(
+      after.comparison.verifications.find(
+        (r: { id: string }) => r.id === fixed.id,
+      ).verdict,
+      JSON.stringify(after.comparison.verifications),
+    ).toBe("resolved");
+    await page.goto(`/app/runs/${failure.id}`);
+    await page
+      .getByRole("button", { name: "Compare runs", exact: true })
+      .click();
+    await expect(page.getByRole("dialog")).toContainText("Regression resolved");
+    const notifications = await (
+      await page.request.get("/api/notifications")
+    ).json();
+    expect(
+      notifications.events.some(
+        (e: { kind: string }) => e.kind === "regression_resolved",
+      ),
+    ).toBe(true);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
 });

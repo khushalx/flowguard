@@ -1,8 +1,9 @@
+import { monitored } from "@/lib/server/monitoring";
 import { z } from "zod";
 import { requireWorkspace } from "@/lib/server/auth";
 import { apiError } from "@/lib/server/http";
 import { artifactDownload } from "@/lib/server/execution-read";
-export async function GET(
+async function GETHandler(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -22,3 +23,5 @@ export async function GET(
     return apiError(error);
   }
 }
+
+export const GET = monitored(GETHandler);

@@ -1,3 +1,4 @@
+import { monitored } from "@/lib/server/monitoring";
 import { z } from "zod";
 import { requireWorkspace } from "@/lib/server/auth";
 import { apiError, jsonBody, sameOrigin } from "@/lib/server/http";
@@ -13,6 +14,8 @@ const input = z.discriminatedUnion("action", [
       projectId: z.string().uuid(),
       requestId: z.string().uuid(),
       journeyIds: z.array(z.string().uuid()).min(1).max(5).optional(),
+      verificationOf: z.string().uuid().optional(),
+      targetUrl: z.string().url().max(2000).optional(),
     })
     .strict(),
   z
@@ -22,7 +25,7 @@ const input = z.discriminatedUnion("action", [
     })
     .strict(),
 ]);
-export async function GET(request: Request) {
+async function GETHandler(request: Request) {
   try {
     const id = z
       .string()
@@ -36,7 +39,7 @@ export async function GET(request: Request) {
     return apiError(error);
   }
 }
-export async function POST(request: Request) {
+async function POSTHandler(request: Request) {
   try {
     sameOrigin(request);
     const context = await requireWorkspace(true);
@@ -52,3 +55,6 @@ export async function POST(request: Request) {
     return apiError(error);
   }
 }
+
+export const GET = monitored(GETHandler);
+export const POST = monitored(POSTHandler);

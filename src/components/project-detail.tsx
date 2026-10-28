@@ -26,6 +26,7 @@ import { connectionLabels } from "./repository-picker";
 import { ProjectSettings } from "./project-settings";
 import { ProjectAvatar, RunList } from "./rows";
 import { ExecutionLauncher } from "./execution-dialog";
+import { explain, unsuccessful } from "@/lib/investigation/evidence";
 export function ProjectDetail({
   id,
   journeysOnly = false,
@@ -47,6 +48,11 @@ export function ProjectDetail({
     .filter((r) => r.projectId === id)
     .sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt));
   const latest = latestRun(runs, id);
+  const current = journeys
+    .map((j) => latestRun(runs, id, j.id))
+    .filter((r) => !!r);
+  const problems = current.filter(unsuccessful);
+  const untested = journeys.length - current.length;
   return (
     <>
       <PageHeader
@@ -98,7 +104,7 @@ export function ProjectDetail({
                 onClick={() => setExecution(true)}
               >
                 <Play size={14} />
-                Run tests
+                Run a check
               </button>
             </>
           )
@@ -154,6 +160,37 @@ export function ProjectDetail({
         </Link>
       </nav>
       {!journeysOnly && (
+        <section
+          className="project-health section"
+          aria-label="Current project health"
+        >
+          <SectionHeading title="Current health" />
+          <p>
+            {!journeys.length
+              ? "No saved checks. Current health is not established."
+              : !runs.length
+                ? "Not tested. No recorded result establishes this site's health."
+                : problems.length
+                  ? `${problems.length} saved check${problems.length === 1 ? "" : "s"} need attention.`
+                  : untested
+                    ? `${untested} saved check${untested === 1 ? "" : "s"} have no result.`
+                    : current.some((r) => r.status !== "passed")
+                      ? "Checks are pending or incomplete. Health is not yet established."
+                      : "Latest recorded checks passed. This describes tested behavior, not the entire website."}
+          </p>
+          {problems.map((r) => (
+            <Link key={r.id} href={`/app/runs/${r.id}`} className="problem-row">
+              <div>
+                <strong>{r.journeyName}</strong>
+                <p className="muted">{explain(r).summary}</p>
+              </div>
+              <StatusIndicator status={r.status} />
+              <ArrowRight size={16} />
+            </Link>
+          ))}
+        </section>
+      )}
+      {!journeysOnly && (
         <section className="latest-run-section">
           <SectionHeading
             title="Latest run"
@@ -171,7 +208,7 @@ export function ProjectDetail({
                   <h2>{latest.journeyName}</h2>
                   <p>
                     {latest.status === "failed"
-                      ? "The confirmation assertion failed. Review the recorded evidence."
+                      ? explain(latest).summary
                       : latest.status === "passed"
                         ? "The success condition matched in this recorded run."
                         : isLive
@@ -218,31 +255,10 @@ export function ProjectDetail({
           )}
         </section>
       )}
-      <section className="section">
-        <SectionHeading
-          title={journeysOnly ? "Journeys" : "Test journeys"}
-          count={journeys.length}
-          action={
-            !journeysOnly &&
-            journeys.length > 0 && (
-              <button className="text-link" onClick={() => setEditor(true)}>
-                <Plus size={14} />
-                Create journey
-              </button>
-            )
-          }
-          description={
-            journeysOnly
-              ? "Journey definitions. Editing keeps previous run history."
-              : undefined
-          }
-        />
-        <JourneysList project={project} journeys={journeys} runs={runs} />
-      </section>
       {!journeysOnly && (
         <section className="section">
           <SectionHeading
-            title="Run history"
+            title="Recent executions"
             count={runs.length}
             action={
               runs.length > 0 && (
@@ -263,6 +279,27 @@ export function ProjectDetail({
           )}
         </section>
       )}
+      <section className="section">
+        <SectionHeading
+          title={journeysOnly ? "Journeys" : "Saved checks"}
+          count={journeys.length}
+          action={
+            !journeysOnly &&
+            journeys.length > 0 && (
+              <button className="text-link" onClick={() => setEditor(true)}>
+                <Plus size={14} />
+                Create journey
+              </button>
+            )
+          }
+          description={
+            journeysOnly
+              ? "Journey definitions. Editing keeps previous run history."
+              : undefined
+          }
+        />
+        <JourneysList project={project} journeys={journeys} runs={runs} />
+      </section>
       {journeysOnly && (
         <div className="workspace-note">
           <ListChecks size={17} />

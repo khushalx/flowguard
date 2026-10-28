@@ -1,6 +1,7 @@
+import { monitored } from "@/lib/server/monitoring";
 import { apiError, jsonBody } from "@/lib/server/http";
 import { completeExecution, runnerAuthorization } from "@/lib/server/execution";
-export async function POST(request: Request) {
+async function POSTHandler(request: Request) {
   try {
     const hash = await runnerAuthorization(request, "exec");
     return Response.json(
@@ -11,3 +12,5 @@ export async function POST(request: Request) {
     return apiError(error);
   }
 }
+
+export const POST = monitored(POSTHandler);

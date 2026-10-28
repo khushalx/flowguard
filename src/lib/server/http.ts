@@ -1,4 +1,5 @@
 import "server-only";
+import { platformError } from "./monitoring";
 import { appOrigin } from "../env";
 import { ZodError } from "zod";
 
@@ -77,6 +78,7 @@ export function apiError(error: unknown) {
 }
 export function dbCheck(error: { code?: string; message: string } | null) {
   if (!error) return;
+  platformError("database_failure", 503);
   console.error("FlowGuard database operation failed", {
     code: error.code ?? "unknown",
   });

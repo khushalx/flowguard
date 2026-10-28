@@ -1,6 +1,7 @@
 "use client";
 import { PageHeader } from "./ui";
 import { GitHubConnection } from "./repository-picker";
+import { NotificationSettings } from "./notification-settings";
 import { LocalImport } from "./local-import";
 export function Connections({ message }: { message?: string }) {
   return (
@@ -27,6 +28,7 @@ export function Connections({ message }: { message?: string }) {
           </p>
           <LocalImport />
         </section>
+        <NotificationSettings />
       </div>
     </>
   );

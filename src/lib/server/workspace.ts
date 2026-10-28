@@ -1,4 +1,6 @@
 import "server-only";
+import { aiConfiguration } from "../investigation/ai";
+import { attachSnapshot, sanitizeRun } from "./report-snapshot";
 import {
   workspaceSchema,
   runSchema,
@@ -365,7 +367,7 @@ export async function readRun(context: Context, id: string) {
   const result = await context.db
     .from("runs")
     .select(
-      `${runColumns},logs,assertion,run_steps(name,status,error_message,metadata,sequence_number),projects!inner(workspace_id)`,
+      `${runColumns},configuration,verification_of,logs,assertion,run_steps(name,status,error_message,metadata,sequence_number),projects!inner(workspace_id)`,
     )
     .eq("id", id)
     .eq("projects.workspace_id", context.workspaceId)
@@ -373,6 +375,7 @@ export async function readRun(context: Context, id: string) {
   dbCheck(result.error);
   if (!result.data) throw new AppError("Run not found in this workspace.", 404);
   const run = runRecord(result.data);
+  run.analysisAvailable = aiConfiguration().enabled;
   if (result.data.batch_id) {
     const [artifact, batch] = await Promise.all([
       context.db
@@ -391,12 +394,25 @@ export async function readRun(context: Context, id: string) {
     dbCheck(batch.error);
     if (artifact.data && Date.parse(artifact.data.expires_at) > Date.now())
       run.screenshot = `/api/runs/${id}/screenshot`;
+    if (batch.data)
+      attachSnapshot(
+        run,
+        result.data.configuration,
+        batch.data.repository_name,
+      );
     if (batch.data?.github_run_id)
       run.githubUrl = `https://github.com/${batch.data.repository_name}/actions/runs/${batch.data.github_run_id}`;
   }
-  return run;
+  return sanitizeRun(
+    attachSnapshot(
+      run,
+      result.data.configuration,
+      run.snapshot?.repository || "",
+    ),
+    result.data.configuration,
+  );
 }
-function runRecord(r: Record<string, unknown>) {
+export function runRecord(r: Record<string, unknown>) {
   return runSchema.parse({
     id: r.id,
     number: r.number,
@@ -442,6 +458,7 @@ function runRecord(r: Record<string, unknown>) {
       ),
     logs: r.logs ?? [],
     assertion: r.assertion ?? undefined,
+    verificationOf: r.verification_of ?? undefined,
     batchId: r.batch_id ?? undefined,
     failureCategory: r.failure_category ?? undefined,
     error: r.error_message ?? undefined,

@@ -16,9 +16,7 @@ test("public homepage has real navigation and a usable investigation preview", a
   await expect(
     page.getByText("Welcome back, Alex", { exact: true }),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Step 1: Open the sign-in page", exact: true })
-    .click();
+  await page.getByRole("button", { name: /Open the sign-in page/ }).click();
   await expect(page.locator(".selected-step-detail")).toContainText(
     "GET /login returned 200",
   );
@@ -80,9 +78,7 @@ test("public preview never changes an existing local workspace", async ({
     localStorage.getItem("flowguard.workspace.v1"),
   );
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "Step 2: Enter account details", exact: true })
-    .click();
+  await page.getByRole("button", { name: /Enter account details/ }).click();
   await page
     .getByRole("link", { name: "Explore the demo", exact: true })
     .click();

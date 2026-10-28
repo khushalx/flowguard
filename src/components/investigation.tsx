@@ -10,6 +10,7 @@ import {
   FileImage,
   FileText,
 } from "lucide-react";
+import { observation } from "@/lib/investigation/evidence";
 import { duration, type Run } from "@/lib/model";
 import { Dialog, SectionHeading, StatusIndicator } from "./ui";
 import { useFeedback } from "./feedback";
@@ -57,7 +58,6 @@ export function Investigation({
                     className="step-select"
                     onClick={() => setSelected(i)}
                     aria-pressed={selected === i}
-                    aria-label={`Step ${i + 1}: ${s.name}`}
                   >
                     <span className="timeline-number mono">
                       {String(i + 1).padStart(2, "0")}
@@ -130,7 +130,7 @@ export function Investigation({
                   </div>
                   <div>
                     <dt>Observed</dt>
-                    <dd>{run.assertion.received}</dd>
+                    <dd>{observation(run)}</dd>
                   </div>
                 </dl>
                 <details className="technical-details">
@@ -139,6 +139,7 @@ export function Investigation({
                     <ChevronDown size={15} />
                   </summary>
                   <div>
+                    <p>{run.error || step?.detail}</p>
                     <span className="muted small-text">Locator</span>
                     <pre>
                       <code>{run.assertion.locator}</code>

@@ -36,6 +36,9 @@ export default defineConfig({
       reuseExistingServer: false,
       timeout: 120000,
       env: {
+        OPENAI_API_KEY: "",
+        SENTRY_DSN: "",
+        NEXT_PUBLIC_SENTRY_DSN: "",
         FLOWGUARD_TEST_DIST: ".next-auth-test",
         NEXT_PUBLIC_APP_URL: "http://127.0.0.1:3010",
         NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:4546",

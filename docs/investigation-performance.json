@@ -1,0 +1,970 @@
+{
+  "date": "2026-10-28",
+  "scope": "Local production Next.js + actual PostgreSQL migrations in PGlite; mocked Auth/GitHub/HTTP gateway. Single samples, not production percentiles. Optional AI/Sentry disabled.",
+  "beforeDesktop": [
+    {
+      "operation": "/app",
+      "ttfbMs": 16,
+      "domInteractiveMs": 23,
+      "lcp": 32,
+      "longTasks": 0,
+      "encodedJsBytes": 222269,
+      "backend": [
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 0
+        },
+        {
+          "path": "/rest/v1/rpc/workspace_context",
+          "method": "POST",
+          "status": 200,
+          "ms": 2
+        },
+        {
+          "path": "/rest/v1/runs",
+          "method": "GET",
+          "status": 200,
+          "ms": 2
+        },
+        {
+          "path": "/rest/v1/projects",
+          "method": "GET",
+          "status": 200,
+          "ms": 2
+        },
+        {
+          "path": "/rest/v1/journeys",
+          "method": "GET",
+          "status": 200,
+          "ms": 3
+        },
+        {
+          "path": "/rest/v1/repositories",
+          "method": "GET",
+          "status": 200,
+          "ms": 4
+        },
+        {
+          "path": "/rest/v1/github_installations",
+          "method": "GET",
+          "status": 200,
+          "ms": 4
+        },
+        {
+          "path": "/rest/v1/rpc/latest_workspace_runs",
+          "method": "POST",
+          "status": 200,
+          "ms": 5
+        }
+      ]
+    },
+    {
+      "operation": "/app/projects/new",
+      "ttfbMs": 28,
+      "domInteractiveMs": 36,
+      "lcp": 48,
+      "longTasks": 0,
+      "encodedJsBytes": 223897,
+      "backend": [
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/rest/v1/rpc/workspace_context",
+          "method": "POST",
+          "status": 200,
+          "ms": 2
+        },
+        {
+          "path": "/rest/v1/runs",
+          "method": "GET",
+          "status": 200,
+          "ms": 2
+        },
+        {
+          "path": "/rest/v1/projects",
+          "method": "GET",
+          "status": 200,
+          "ms": 3
+        },
+        {
+          "path": "/rest/v1/journeys",
+          "method": "GET",
+          "status": 200,
+          "ms": 4
+        },
+        {
+          "path": "/rest/v1/repositories",
+          "method": "GET",
+          "status": 200,
+          "ms": 4
+        },
+        {
+          "path": "/rest/v1/github_installations",
+          "method": "GET",
+          "status": 200,
+          "ms": 5
+        },
+        {
+          "path": "/rest/v1/rpc/latest_workspace_runs",
+          "method": "POST",
+          "status": 200,
+          "ms": 6
+        },
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 0
+        },
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 0
+        },
+        {
+          "path": "/rest/v1/rpc/workspace_context",
+          "method": "POST",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/rest/v1/github_installations",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/rest/v1/profiles",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/rest/v1/repositories",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/rest/v1/github_installations",
+          "method": "GET",
+          "status": 200,
+          "ms": 2
+        }
+      ]
+    },
+    {
+      "operation": "/app/runs",
+      "ttfbMs": 36,
+      "domInteractiveMs": 43,
+      "lcp": 52,
+      "longTasks": 0,
+      "encodedJsBytes": 222190,
+      "backend": [
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/rest/v1/rpc/workspace_context",
+          "method": "POST",
+          "status": 200,
+          "ms": 4
+        },
+        {
+          "path": "/rest/v1/runs",
+          "method": "GET",
+          "status": 200,
+          "ms": 3
+        },
+        {
+          "path": "/rest/v1/projects",
+          "method": "GET",
+          "status": 200,
+          "ms": 4
+        },
+        {
+          "path": "/rest/v1/journeys",
+          "method": "GET",
+          "status": 200,
+          "ms": 5
+        },
+        {
+          "path": "/rest/v1/repositories",
+          "method": "GET",
+          "status": 200,
+          "ms": 6
+        },
+        {
+          "path": "/rest/v1/github_installations",
+          "method": "GET",
+          "status": 200,
+          "ms": 7
+        },
+        {
+          "path": "/rest/v1/rpc/latest_workspace_runs",
+          "method": "POST",
+          "status": 200,
+          "ms": 8
+        }
+      ]
+    },
+    {
+      "operation": "client navigation projects to new project",
+      "totalMs": 79,
+      "encodedJsBytes": 0,
+      "backend": [
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 0
+        },
+        {
+          "path": "/rest/v1/rpc/workspace_context",
+          "method": "POST",
+          "status": 200,
+          "ms": 2
+        },
+        {
+          "path": "/rest/v1/github_installations",
+          "method": "GET",
+          "status": 200,
+          "ms": 2
+        },
+        {
+          "path": "/rest/v1/profiles",
+          "method": "GET",
+          "status": 200,
+          "ms": 2
+        }
+      ]
+    },
+    {
+      "operation": "create project without repository",
+      "totalMs": 60,
+      "encodedJsBytes": 0,
+      "backend": [
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 0
+        },
+        {
+          "path": "/rest/v1/rpc/workspace_context",
+          "method": "POST",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/rest/v1/projects",
+          "method": "POST",
+          "status": 200,
+          "ms": 2
+        },
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 0
+        }
+      ]
+    }
+  ],
+  "afterDesktop": [
+    {
+      "operation": "/app",
+      "ttfbMs": 11,
+      "domInteractiveMs": 16,
+      "lcp": 24,
+      "longTasks": 0,
+      "encodedJsBytes": 222403,
+      "backend": [
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 0
+        },
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 0
+        },
+        {
+          "path": "/rest/v1/rpc/workspace_context",
+          "method": "POST",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/rest/v1/runs",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/rest/v1/projects",
+          "method": "GET",
+          "status": 200,
+          "ms": 2
+        },
+        {
+          "path": "/rest/v1/journeys",
+          "method": "GET",
+          "status": 200,
+          "ms": 2
+        },
+        {
+          "path": "/rest/v1/repositories",
+          "method": "GET",
+          "status": 200,
+          "ms": 3
+        },
+        {
+          "path": "/rest/v1/github_installations",
+          "method": "GET",
+          "status": 200,
+          "ms": 3
+        },
+        {
+          "path": "/rest/v1/rpc/latest_workspace_runs",
+          "method": "POST",
+          "status": 200,
+          "ms": 4
+        }
+      ]
+    },
+    {
+      "operation": "/app/projects/new",
+      "ttfbMs": 22,
+      "domInteractiveMs": 30,
+      "lcp": 44,
+      "longTasks": 0,
+      "encodedJsBytes": 224028,
+      "backend": [
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/rest/v1/rpc/workspace_context",
+          "method": "POST",
+          "status": 200,
+          "ms": 2
+        },
+        {
+          "path": "/rest/v1/runs",
+          "method": "GET",
+          "status": 200,
+          "ms": 2
+        },
+        {
+          "path": "/rest/v1/projects",
+          "method": "GET",
+          "status": 200,
+          "ms": 3
+        },
+        {
+          "path": "/rest/v1/journeys",
+          "method": "GET",
+          "status": 200,
+          "ms": 4
+        },
+        {
+          "path": "/rest/v1/repositories",
+          "method": "GET",
+          "status": 200,
+          "ms": 4
+        },
+        {
+          "path": "/rest/v1/github_installations",
+          "method": "GET",
+          "status": 200,
+          "ms": 5
+        },
+        {
+          "path": "/rest/v1/rpc/latest_workspace_runs",
+          "method": "POST",
+          "status": 200,
+          "ms": 6
+        },
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 0
+        },
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 0
+        },
+        {
+          "path": "/rest/v1/rpc/workspace_context",
+          "method": "POST",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/rest/v1/github_installations",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/rest/v1/profiles",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/rest/v1/repositories",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/rest/v1/github_installations",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        }
+      ]
+    },
+    {
+      "operation": "/app/runs",
+      "ttfbMs": 22,
+      "domInteractiveMs": 31,
+      "lcp": 40,
+      "longTasks": 0,
+      "encodedJsBytes": 222324,
+      "backend": [
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/rest/v1/rpc/workspace_context",
+          "method": "POST",
+          "status": 200,
+          "ms": 2
+        },
+        {
+          "path": "/rest/v1/runs",
+          "method": "GET",
+          "status": 200,
+          "ms": 2
+        },
+        {
+          "path": "/rest/v1/projects",
+          "method": "GET",
+          "status": 200,
+          "ms": 3
+        },
+        {
+          "path": "/rest/v1/journeys",
+          "method": "GET",
+          "status": 200,
+          "ms": 4
+        },
+        {
+          "path": "/rest/v1/repositories",
+          "method": "GET",
+          "status": 200,
+          "ms": 5
+        },
+        {
+          "path": "/rest/v1/github_installations",
+          "method": "GET",
+          "status": 200,
+          "ms": 6
+        },
+        {
+          "path": "/rest/v1/rpc/latest_workspace_runs",
+          "method": "POST",
+          "status": 200,
+          "ms": 7
+        }
+      ]
+    },
+    {
+      "operation": "client navigation projects to new project",
+      "totalMs": 76,
+      "encodedJsBytes": 0,
+      "backend": [
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 0
+        },
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 0
+        },
+        {
+          "path": "/rest/v1/rpc/workspace_context",
+          "method": "POST",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/rest/v1/github_installations",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/rest/v1/profiles",
+          "method": "GET",
+          "status": 200,
+          "ms": 2
+        }
+      ]
+    },
+    {
+      "operation": "create project without repository",
+      "totalMs": 59,
+      "encodedJsBytes": 0,
+      "backend": [
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 0
+        },
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 0
+        },
+        {
+          "path": "/rest/v1/rpc/workspace_context",
+          "method": "POST",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/rest/v1/projects",
+          "method": "POST",
+          "status": 200,
+          "ms": 2
+        },
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 0
+        }
+      ]
+    }
+  ],
+  "afterMobile": [
+    {
+      "operation": "/app",
+      "ttfbMs": 11,
+      "domInteractiveMs": 16,
+      "lcp": 24,
+      "longTasks": 0,
+      "encodedJsBytes": 222403,
+      "backend": [
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 0
+        },
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 0
+        },
+        {
+          "path": "/rest/v1/rpc/workspace_context",
+          "method": "POST",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/rest/v1/runs",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/rest/v1/projects",
+          "method": "GET",
+          "status": 200,
+          "ms": 2
+        },
+        {
+          "path": "/rest/v1/journeys",
+          "method": "GET",
+          "status": 200,
+          "ms": 2
+        },
+        {
+          "path": "/rest/v1/repositories",
+          "method": "GET",
+          "status": 200,
+          "ms": 2
+        },
+        {
+          "path": "/rest/v1/github_installations",
+          "method": "GET",
+          "status": 200,
+          "ms": 3
+        },
+        {
+          "path": "/rest/v1/rpc/latest_workspace_runs",
+          "method": "POST",
+          "status": 200,
+          "ms": 3
+        }
+      ]
+    },
+    {
+      "operation": "/app/projects/new",
+      "ttfbMs": 22,
+      "domInteractiveMs": 30,
+      "lcp": 40,
+      "longTasks": 0,
+      "encodedJsBytes": 224028,
+      "backend": [
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/rest/v1/rpc/workspace_context",
+          "method": "POST",
+          "status": 200,
+          "ms": 3
+        },
+        {
+          "path": "/rest/v1/runs",
+          "method": "GET",
+          "status": 200,
+          "ms": 2
+        },
+        {
+          "path": "/rest/v1/projects",
+          "method": "GET",
+          "status": 200,
+          "ms": 3
+        },
+        {
+          "path": "/rest/v1/journeys",
+          "method": "GET",
+          "status": 200,
+          "ms": 4
+        },
+        {
+          "path": "/rest/v1/repositories",
+          "method": "GET",
+          "status": 200,
+          "ms": 5
+        },
+        {
+          "path": "/rest/v1/github_installations",
+          "method": "GET",
+          "status": 200,
+          "ms": 5
+        },
+        {
+          "path": "/rest/v1/rpc/latest_workspace_runs",
+          "method": "POST",
+          "status": 200,
+          "ms": 6
+        },
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 0
+        },
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 0
+        },
+        {
+          "path": "/rest/v1/rpc/workspace_context",
+          "method": "POST",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/rest/v1/github_installations",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/rest/v1/profiles",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/rest/v1/repositories",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/rest/v1/github_installations",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        }
+      ]
+    },
+    {
+      "operation": "/app/runs",
+      "ttfbMs": 22,
+      "domInteractiveMs": 30,
+      "lcp": 36,
+      "longTasks": 0,
+      "encodedJsBytes": 222324,
+      "backend": [
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/rest/v1/rpc/workspace_context",
+          "method": "POST",
+          "status": 200,
+          "ms": 3
+        },
+        {
+          "path": "/rest/v1/runs",
+          "method": "GET",
+          "status": 200,
+          "ms": 2
+        },
+        {
+          "path": "/rest/v1/projects",
+          "method": "GET",
+          "status": 200,
+          "ms": 3
+        },
+        {
+          "path": "/rest/v1/journeys",
+          "method": "GET",
+          "status": 200,
+          "ms": 3
+        },
+        {
+          "path": "/rest/v1/repositories",
+          "method": "GET",
+          "status": 200,
+          "ms": 4
+        },
+        {
+          "path": "/rest/v1/github_installations",
+          "method": "GET",
+          "status": 200,
+          "ms": 5
+        },
+        {
+          "path": "/rest/v1/rpc/latest_workspace_runs",
+          "method": "POST",
+          "status": 200,
+          "ms": 5
+        }
+      ]
+    },
+    {
+      "operation": "client navigation projects to new project",
+      "totalMs": 71,
+      "encodedJsBytes": 0,
+      "backend": [
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 0
+        },
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 0
+        },
+        {
+          "path": "/rest/v1/rpc/workspace_context",
+          "method": "POST",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/rest/v1/github_installations",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/rest/v1/profiles",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        }
+      ]
+    },
+    {
+      "operation": "create project without repository",
+      "totalMs": 60,
+      "encodedJsBytes": 0,
+      "backend": [
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/rest/v1/rpc/workspace_context",
+          "method": "POST",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/rest/v1/projects",
+          "method": "POST",
+          "status": 200,
+          "ms": 1
+        },
+        {
+          "path": "/auth/v1/user",
+          "method": "GET",
+          "status": 200,
+          "ms": 0
+        }
+      ]
+    }
+  ],
+  "investigationDesktop": {
+    "reportTiming": {
+      "evidenceMs": 10.312625000000025,
+      "templateMs": 0.2770839999998316,
+      "comparisonMs": 0.1485829999996895
+    },
+    "reportBytes": 5408,
+    "browserLogs": ["Chromium startup: 63ms."]
+  },
+  "investigationMobile": {
+    "reportTiming": {
+      "evidenceMs": 7.288583999999901,
+      "templateMs": 0.05512499999986176,
+      "comparisonMs": 0.02179100000012113
+    },
+    "reportBytes": 5409,
+    "browserLogs": ["Chromium startup: 63ms."]
+  }
+}

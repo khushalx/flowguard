@@ -1,6 +1,6 @@
 # Phase 3 verification — 28 October 2026
 
-Implementation is local and has not been pushed, deployed or migrated into hosted Supabase.
+The application is deployed. On 28 October 2026, the execution-engine migration was applied to hosted Supabase to repair a deployment/schema mismatch; the authenticated production overview now loads successfully.
 
 | Check                                                         | Result                                                                   |
 | ------------------------------------------------------------- | ------------------------------------------------------------------------ |
@@ -22,4 +22,14 @@ Runner coverage includes all nine actions, a working form and navigation, missin
 
 Desktop/mobile editor screenshots were inspected. The editor and execution view passed automated accessibility/overflow checks. A real sanitized trace was opened in the installed Playwright trace viewer in Chromium: action timings loaded without page errors, while network content, form values, snapshots and source resources were absent.
 
-The SQL fixtures do not implement hosted Supabase Storage. Signed upload/download behavior, MIME/size verification against hosted Storage, deployed cron delivery, GitHub's live permission grant and a real external workflow are **unverified externally**. The new migration has not been applied to the hosted project, and hosted advisors must be run after applying it. External Test 10 is pending the rollout steps in [ENGINE_SETUP.md](ENGINE_SETUP.md). No fake production result or acceptance claim was created.
+The SQL fixtures do not implement hosted Supabase Storage. Signed upload/download behavior, MIME/size verification against hosted Storage, deployed cron delivery, GitHub's live permission grant and a real external workflow are **unverified externally**. The migration is installed on the hosted project, and security/performance advisors were checked after applying it. The private PNG bucket configuration and browser write restrictions were verified; actual signed artifact transfers remain unverified. External Test 10 is pending the rollout steps in [ENGINE_SETUP.md](ENGINE_SETUP.md). No fake production result or acceptance claim was created.
+
+## Hosted workspace repair — 28 October 2026
+
+The deployed workspace reader selected Phase 3 columns (`journeys.enabled` and the execution fields on `runs`) before the corresponding migration existed in production. This caused the generic database-request error after successful sign-in. Applied the reviewed, additive execution-engine migration once through Supabase; its hosted version is `20261028084831`, and the local filename now matches that history entry. SQL contents are unchanged.
+
+Before and after: 1 workspace, 1 project, 0 journeys, 0 runs. No existing records were deleted or replaced. The existing GitHub sign-in completed and the live `/app` overview displayed the existing project. Authentication, environment variables and application code were unchanged; no redeployment was needed for this repair.
+
+After aligning the local migration filename with hosted history, all 40 security/database tests, TypeScript checks, ESLint and the production build passed again.
+
+Verified the engine RPC is unavailable to the authenticated browser role, direct browser inserts into runs are denied, and private runner credential records remain unreadable. The evidence bucket is private, accepts PNG only, and limits objects to 2 MiB. Advisors reported no new warning/error from this migration; intentional private-table deny-all RLS notices and the pre-existing password-protection warning remain. Live workflow execution, artifact transfers and external Test 10 remain pending.

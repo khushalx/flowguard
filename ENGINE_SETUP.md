@@ -2,12 +2,12 @@
 
 Phase 3 adds real Chromium execution through a connected repository's GitHub Actions. Vercel coordinates dispatch, scoped authentication, persistence and authorized evidence access; it never launches a browser. `/demo` remains local sample data.
 
-**Rollout status:** implementation and local verification are available in this working tree. This change has not been pushed, deployed, or migrated into the hosted Supabase project. External acceptance Test 10 has **not** passed: no live customer workflow has returned a result during this implementation. Review and publish the runner source, apply the migration, deploy, and complete the repository setup below before expecting production execution.
+**Rollout status (28 October 2026):** the application is deployed, and the execution-engine migration is installed on the hosted FlowGuard database as version `20261028084831`. The authenticated production overview was verified after repairing the missing migration. External acceptance Test 10 has **not** passed: no live customer workflow has returned a verified result. Complete the runner publication and repository setup below before expecting production execution.
 
 ## 1. Review and deploy the application
 
-1. Review the source and `supabase/migrations/20261028040141_execution_engine.sql`. It extends existing journeys/runs, adds batches and private credential verifiers, restricts all client writes to execution data, and creates a private PNG bucket. It inserts no sample results. Existing free-text journeys remain intact and require structured configuration before execution.
-2. Verify migration history **before** using `supabase db push`. This project's foundation was originally applied without a history entry. Follow the history repair guidance in `SETUP.md`; do not replay the foundation or stabilization SQL. The existing hosted project needs only the new execution migration. A fresh database needs all migrations in timestamp order. Apply this migration once, before deploying this source.
+1. Review the source and `supabase/migrations/20261028084831_execution_engine.sql`. It extends existing journeys/runs, adds batches and private credential verifiers, restricts all client writes to execution data, and creates a private PNG bucket. It inserts no sample results. Existing free-text journeys remain intact and require structured configuration before execution.
+2. Verify migration history **before** using `supabase db push`. This project's foundation was originally applied without a history entry. Follow the history repair guidance in `SETUP.md`; do not replay the foundation or stabilization SQL. The current hosted FlowGuard project already has the execution migration; do not replay it. Its local filename matches the version recorded by Supabase. A fresh database needs all migrations in timestamp order. For other existing projects, apply this migration once before deploying this source.
 3. Keep the `private` schema unexposed. Run Supabase security/performance advisors after applying the migration. Check `flowguard-evidence` is private with a 2 MiB object limit and PNG MIME restriction. There should be no public or authenticated storage upload/list policy for this bucket.
 4. Preserve existing environment variables from `.env.example`: the three public auth settings, server Supabase secret, and GitHub App credentials/webhook secret. Add **`CRON_SECRET`**, a high-entropy server-only value of at least 32 random bytes, in Vercel Production. Never put it in a `NEXT_PUBLIC_` variable or customer workflow.
 5. Review and publish the commit containing `packages/runner` and its lockfile. Record the actual immutable 40-character SHA; this guide deliberately contains no invented release SHA. No npm runner package is assumed to exist.
@@ -53,7 +53,7 @@ Both variants intentionally avoid checking out or executing untrusted forked PR 
 ## 4. Configure repository-scoped authentication
 
 1. In FlowGuard, link the project to the intended connected personal repository.
-2. Open the project's **Run tests** dialog → **Runner setup** as the workspace owner.
+2. Open the project's **Run a check** dialog → **Runner setup** as the workspace owner.
 3. Generate a runner credential. Copy it immediately; it is displayed once and is never stored in browser storage. FlowGuard stores only its SHA-256 verifier.
 4. Save the credential in that repository's **Actions secret** named **`FLOWGUARD_RUNNER_TOKEN`**. Do not save it as a repository variable or workflow input.
 5. Return to FlowGuard and choose **Check setup again**.
@@ -74,7 +74,7 @@ For a first smoke test:
 2. Create a journey named **Home heading** with starting path `/`.
 3. Keep **Assert text**, choose **Role: heading**, and enter the page's actual heading in **Accessible name** and **Expected value**. Match the deployed page exactly; do not use a guessed heading.
 4. Set the step timeout to 5000 ms and overall timeout to 60000 ms. Keep the journey enabled. Save.
-5. Click **Run tests**, review setup/skipped journeys, then **Run 1 journey**. A row action can run just one journey; the project action runs all eligible journeys, up to five.
+5. Click **Run a check**, review setup/skipped journeys, then **Run 1 journey**. A row action can run just one journey; the project action runs all eligible journeys, up to five.
 6. The execution page shows persisted queued/running states and the actual GitHub Actions job link. When the runner reports back, the batch and run become passed, failed, error, timed out or cancelled. Open the journey's run row for actual steps, durations, commit, branch and evidence. Reload to verify persistence.
 
 For a login-like form, add Fill Email, Fill Password, Click Sign in, Assert URL contains `/dashboard`, and Assert visible → heading → Dashboard. Use resilient role, label, placeholder, test ID or exact text locators. CSS is an advanced option. A positive assertion is mandatory; navigation alone and an element-count assertion of zero alone cannot produce a valid journey.

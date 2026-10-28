@@ -1,5 +1,6 @@
 import "server-only";
 import { serverClient } from "../supabase/server";
+import { platformError } from "./monitoring";
 import { AppError, dbCheck } from "./http";
 import { cache } from "react";
 import { z } from "zod";
@@ -19,11 +20,13 @@ export const requireIdentity = cache(async () => {
   if (
     error &&
     (error.name === "AuthRetryableFetchError" || (error.status ?? 0) >= 500)
-  )
+  ) {
+    platformError("auth_failure", 503);
     throw new AppError(
       "Sign-in verification is temporarily unavailable. Try again shortly.",
       503,
     );
+  }
   if (error || !data.user || data.user.is_anonymous)
     throw new AppError("Your session has expired. Sign in again.", 401);
   return { db, user: data.user };

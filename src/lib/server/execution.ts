@@ -228,14 +228,60 @@ function executionMessage(error: unknown) {
 }
 export async function queueExecution(
   context: Context,
-  input: { projectId: string; requestId: string; journeyIds?: string[] },
+  input: {
+    projectId: string;
+    requestId: string;
+    journeyIds?: string[];
+    verificationOf?: string;
+    targetUrl?: string;
+  },
 ) {
   await engineOperation("expire");
   const linked = await projectExecution(context, input.projectId);
-  const target = approvedUrl(
-    linked.project.target_url,
-    linked.project.target_url,
-  );
+  type VerificationSource = {
+    id: string;
+    journey_id: string;
+    configuration: {
+      definition: unknown;
+      startPath: string;
+      targetUrl: string;
+    };
+    status: string;
+  };
+  let source: VerificationSource | null = null;
+  if (input.verificationOf) {
+    const saved = await context.db
+      .from("runs")
+      .select("id,journey_id,configuration,status")
+      .eq("id", input.verificationOf)
+      .eq("project_id", input.projectId)
+      .maybeSingle();
+    dbCheck(saved.error);
+    if (
+      !saved.data ||
+      !["failed", "error", "timed_out", "cancelled"].includes(
+        saved.data.status,
+      ) ||
+      !saved.data.journey_id ||
+      !journeyDefinitionSchema.safeParse(saved.data.configuration?.definition)
+        .success
+    )
+      throw new AppError(
+        "Verification needs an unsuccessful saved check with an immutable test snapshot.",
+        409,
+      );
+    source = saved.data as VerificationSource;
+    input = { ...input, journeyIds: [saved.data.journey_id] };
+  } else if (input.targetUrl)
+    throw new AppError(
+      "Target selection is available only for saved fix verification.",
+      400,
+    );
+  const targetValue =
+    input.targetUrl ||
+    source?.configuration.targetUrl ||
+    linked.project.target_url;
+  const target = approvedUrl(targetValue, targetValue);
   const addresses = await resolveDestination(
     new URL(target).hostname.replace(/^\[|\]$/g, ""),
   );
@@ -264,9 +310,10 @@ export async function queueExecution(
   if (!selected.length || selected.length > 5)
     throw new AppError("Run between 1 and 5 valid journeys per batch.", 400);
   for (const journey of selected) {
-    approvedUrl(journey.start_path, target);
-    for (const step of journeyDefinitionSchema.parse(journey.configuration)
-      .steps)
+    approvedUrl(source?.configuration.startPath || journey.start_path, target);
+    for (const step of journeyDefinitionSchema.parse(
+      source?.configuration.definition || journey.configuration,
+    ).steps)
       if (step.action === "navigate") approvedUrl(step.path, target);
   }
   let batchId: string | undefined;
@@ -302,6 +349,16 @@ export async function queueExecution(
       request_id: input.requestId,
       journey_ids: selected.map((j) => j.id),
       workflow_id: workflow.data.id,
+      ...(source
+        ? {
+            source_run_id: source.id,
+            target_url:
+              new URL(target).href ===
+              new URL(source.configuration.targetUrl).href
+                ? source.configuration.targetUrl
+                : target,
+          }
+        : {}),
     });
     batchId = queued.id;
     if (queued.duplicate) return { id: batchId };
