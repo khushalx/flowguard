@@ -13,7 +13,9 @@ Set `NEXT_PUBLIC_APP_URL=http://127.0.0.1:3000` locally. Use that exact hostname
 
 Create or choose your Supabase project. Copy its URL and **publishable** key from Connect / API keys into `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Put its server **secret** key (`sb_secret_...`) in `SUPABASE_SECRET_KEY`. Never prefix a secret key with `NEXT_PUBLIC_`.
 
-Apply the migrations in `supabase/migrations/` in timestamp order. Existing Phase 2 databases need only `20261028000816_stabilize_connections.sql`; do not rerun the foundation SQL. Alternatively, use the pinned CLI:
+Apply the migrations in `supabase/migrations/` in timestamp order. Existing Phase 2 databases need only `20261028034001_stabilize_connections.sql`; do not rerun the foundation SQL. Alternatively, use the pinned CLI:
+
+The current hosted FlowGuard project already received the stabilization migration during the sign-in repair. Do not apply it again. Its foundation schema was set up without a migration-history entry; before a future CLI push, verify that schema and record the existing foundation with `npx supabase migration repair 20261027215703 --status applied --linked`. Check migration history before executing any pending SQL. Fresh projects need both migration files.
 
 ```sh
 npx supabase login

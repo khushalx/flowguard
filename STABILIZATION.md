@@ -1,6 +1,14 @@
 # FlowGuard stabilization — 28 October 2026
 
-Implemented and verified locally. No source was pushed, production deployment created, or hosted migration applied in this stabilization pass. The existing interface and product scope are preserved. Customer test execution remains unavailable; the internal regression fixtures do not create customer test results.
+The stabilization implementation was initially verified locally without pushing source or creating a deployment. During the subsequent sign-in incident, the missing stabilization migration was applied to hosted Supabase and the live personal workspace was verified in the user's browser. The existing interface and product scope are preserved. Customer test execution remains unavailable; the internal regression fixtures do not create customer test results.
+
+## Follow-up: live sign-in failure resolved
+
+The live `/login?error=callback_failed` screen was caused by a deployed-code/database mismatch: `src/app/auth/callback/route.ts` exchanged the OAuth code, then called `requireWorkspace()`, which requested the missing `public.workspace_context()` RPC. The callback's catch returned the generic sign-in error. The hosted project had the foundation schema but neither stabilization RPC nor the two new installation columns.
+
+Applied the reviewed stabilization SQL through Supabase as migration `20261028034001_stabilize_connections`. The repository filename now matches that recorded version; its SQL is unchanged. Verified the functions exist, use security invoker, permit authenticated execution and deny anonymous execution. An authenticated-role, rolled-back RLS query returned exactly one personal context for an existing workspace. Security advisors no longer flag the optional auto-RLS helper's public execution privileges. The existing browser session then loaded the live `/app` Overview successfully without another OAuth grant or a deployment.
+
+The foundation schema was originally applied outside tracked migration history. Before a future CLI push to this existing project, reconcile that foundation entry rather than rerunning its SQL: after confirming the existing schema, use `npx supabase migration repair 20261027215703 --status applied --linked`. The stabilization entry is already recorded and must not be applied again. Fresh databases still need both migrations in order. This incident fix did not change credentials, weaken RLS or delete user data. A fresh OAuth authorization flow was not repeated.
 
 ## Audit and causes
 
@@ -71,7 +79,7 @@ Limits:
 
 ## Database migration and security review
 
-Apply `supabase/migrations/20261028000816_stabilize_connections.sql` before deploying this source. It adds:
+Apply `supabase/migrations/20261028034001_stabilize_connections.sql` before deploying this source. It adds:
 
 - `workspace_context()` and `latest_workspace_runs(uuid)`: read-only, security-invoker RPCs governed by existing table RLS, unavailable to anonymous callers.
 - A latest-run index and installation `last_synced_at` / `disconnected_at` columns.
