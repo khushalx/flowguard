@@ -56,16 +56,3 @@ No real browser tests run yet. Run tests / Run again explain Phase 3 availabilit
 - `src/components/` — existing UI plus account, connection, repository-picker and import interactions.
 - `src/app/fonts/`, `public/brand/` — local fonts/licenses and flat identity. The landing sculpture uses lightweight SVG/CSS with reduced-motion/static mobile behavior; no 3D engine is loaded.
 
-## Checks
-
-```sh
-npm run test:security
-npx playwright install chromium
-npm run test:e2e
-npm run test:integration
-npm run lint
-npm run typecheck
-npm run build
-```
-
-Security tests execute the migration in a real PostgreSQL engine (PGlite), with minimal Supabase Auth/JWT stubs. GitHub API tests mock ownership responses, metadata-only token creation and paginated repository lists. The integration suite runs a separate local Auth/PostgREST fixture backed by the actual SQL migration: it exercises PKCE, cookies, authenticated CRUD, explicit import/deduplication, logout and session revocation on desktop/mobile. OAuth and the HTTP gateway are mocks; this does not verify hosted Supabase or live GitHub. Browser regression tests also cover public/private routing, demo persistence, responsive layouts and axe accessibility. See SETUP.md for the live two-account procedure. Production starts with `npm run start` after building.
